@@ -127,13 +127,30 @@ export function normalizeMatchText(s: string): string {
  */
 export function extractCitationNeedle(citation: string): string {
   const quoted = citation.match(/'([^']+)'|"([^"]+)"/g);
+  let needle: string;
   if (quoted && quoted.length > 0) {
-    return quoted
+    needle = quoted
       .map(q => q.slice(1, -1))
       .sort((a, b) => b.length - a.length)[0];
+  } else {
+    const lastColon = citation.lastIndexOf(':');
+    needle = lastColon >= 0 ? citation.slice(lastColon + 1).trim() : citation;
   }
-  const lastColon = citation.lastIndexOf(':');
-  return lastColon >= 0 ? citation.slice(lastColon + 1).trim() : citation;
+  return stripQuoteMarkup(needle);
+}
+
+/**
+ * LLMs quoting DocAI's HTML tables copy the markup ('225</td><td>45.00').
+ * Tags never appear in the rendered document, so each run of tags becomes a
+ * " | " cell separator; locateCitation then matches the pieces in order
+ * within one table row.
+ */
+function stripQuoteMarkup(quote: string): string {
+  if (!/<\/?[a-z][^>]*>/i.test(quote)) return quote;
+  return quote
+    .replace(/(?:\s*<\/?[a-z][^>]*>\s*)+/gi, ' | ')
+    .replace(/^\s*\|\s*|\s*\|\s*$/g, '')
+    .trim();
 }
 
 /**
@@ -372,16 +389,20 @@ export function stripCitationReason(citation: string): string {
 /**
  * Locate a citation on the document: find the segment (or table cell) whose
  * text matches the citation's quoted content, and return its page-relative
- * PDF-point bounding box. Match order: exact cell text → segment markdown
- * contains the needle → cell text contains the needle. The needle is split
- * on '…' runs so LLM-truncated quotes ("…") still match.
+ * PDF-point bounding box. Match order: exact cell text (hinted row first) →
+ * table row containing every part in order → non-table segment markdown →
+ * cell text contains the needle → row-hint token scoring. The needle is
+ * split on '…' runs and " | " cell separators (including stripped HTML
+ * table markup) so truncated and multi-cell quotes still match.
  */
 export function locateCitation(
   citation: string,
   segments: SegmentLike[]
 ): CitationLocation | null {
+  // Parts: '…'-truncated fragments, or table cells (" | " — from the prompt's
+  // row format, or from stripped HTML markup). All must match in order.
   const parts = extractCitationNeedle(citation)
-    .split(/\.{3,}/)
+    .split(/\.{3,}|\|/)
     .map(normalizeMatchText)
     .filter(p => p.length >= 2);
   if (parts.length === 0) return null;
@@ -390,23 +411,59 @@ export function locateCitation(
   // Short single-fragment needles are only matched exactly (cell text), not
   // as substrings — otherwise "470" would hit the first cell containing it.
   const fuzzy = single ? parts[0].length >= 3 : true;
+  // "row 3" in the location hint. Counted 1-based from the first data row
+  // (cells row 1) per the prompt, but some models count the header row —
+  // so candidates are n, then n-1.
+  const rowHintMatch = citation.match(/\b(?:row|line)\s+(\d+)\b/i);
+  const hintRows = rowHintMatch ? [parseInt(rowHintMatch[1], 10), parseInt(rowHintMatch[1], 10) - 1] : [];
+  const tables = segments.filter(seg => (seg.cells?.length ?? 0) > 0);
 
-  // 1) exact cell text (tables) — strongest signal
+  // 1) exact cell text (tables) — strongest signal. A value repeated across
+  // rows (VAT rate, qty) resolves to the hinted row first.
   if (single) {
-    for (const seg of segments) {
-      for (const cell of seg.cells ?? []) {
-        const t = normalizeMatchText(cell.text || '');
-        if (t && t === parts[0]) {
-          const cb = cellBoxFor(cell, seg);
-          if (cb) return { page: seg.coordinates?.pageNumber ?? 1, ...cb, segmentId: seg.id, matchedText: cell.text || '', needle };
+    const exactCell = (rowFilter: (row: number) => boolean): CitationLocation | null => {
+      for (const seg of tables) {
+        for (const cell of seg.cells ?? []) {
+          if (!rowFilter(cell.row)) continue;
+          const t = normalizeMatchText(cell.text || '');
+          if (t && t === parts[0]) {
+            const cb = cellBoxFor(cell, seg);
+            if (cb) return { page: seg.coordinates?.pageNumber ?? 1, ...cb, segmentId: seg.id, matchedText: cell.text || '', needle };
+          }
         }
+      }
+      return null;
+    };
+    for (const row of hintRows) {
+      const hit = exactCell(r => r === row);
+      if (hit) return hit;
+    }
+    const hit = exactCell(() => true);
+    if (hit) return hit;
+  }
+
+  // 2) table row: the needle's parts appear in order within ONE row's cells
+  // (multi-cell quotes like '225 | 45.00' or '400 21.00'). Returns the row
+  // band, so the highlight is that row — never the whole table.
+  if (fuzzy) {
+    for (const seg of tables) {
+      const rows = [...new Set((seg.cells ?? []).map(c => c.row))].sort((a, b) => a - b);
+      const ordered = [...hintRows.filter(r => rows.includes(r)), ...rows.filter(r => !hintRows.includes(r))];
+      for (const row of ordered) {
+        if (!containsOrdered(normalizeMatchText(tableRowText(seg, row)), parts)) continue;
+        const box = tableRowBandBox(seg, row);
+        if (box) return { page: seg.coordinates?.pageNumber ?? 1, ...box, segmentId: seg.id, matchedText: tableRowText(seg, row), needle };
       }
     }
   }
 
-  // 2) segment markdown contains the needle (line-level chunk)
+  // 3) non-table segment markdown contains the needle (line-level chunk).
+  // Tables are excluded: a match on a table's raw HTML yields the whole-table
+  // box, which the viewer turned into whichever row sat at the table's
+  // vertical center — a confidently wrong highlight.
   if (fuzzy) {
     for (const seg of segments) {
+      if ((seg.cells?.length ?? 0) > 0) continue;
       const md = normalizeMatchText(seg.markdown || '');
       if (md && containsOrdered(md, parts)) {
         const b = segmentBox(seg);
@@ -414,39 +471,32 @@ export function locateCitation(
       }
     }
 
-    // 3) cell text contains the needle (e.g. the needle is a value fragment)
-    if (fuzzy) {
-      for (const seg of segments) {
-        for (const cell of seg.cells ?? []) {
-          const t = normalizeMatchText(cell.text || '');
-          if (t && containsOrdered(t, parts)) {
-            const cb = cellBoxFor(cell, seg);
-            if (cb) return { page: seg.coordinates?.pageNumber ?? 1, ...cb, segmentId: seg.id, matchedText: cell.text || '', needle };
-          }
+    // 4) cell text contains the needle (e.g. the needle is a value fragment)
+    for (const seg of tables) {
+      for (const cell of seg.cells ?? []) {
+        const t = normalizeMatchText(cell.text || '');
+        if (t && containsOrdered(t, parts)) {
+          const cb = cellBoxFor(cell, seg);
+          if (cb) return { page: seg.coordinates?.pageNumber ?? 1, ...cb, segmentId: seg.id, matchedText: cell.text || '', needle };
         }
       }
     }
   }
 
-  // 4) row-hint fallback: LLM composite quotes like "row 1: 'Qty 16'" combine
+  // 5) row-hint fallback: LLM composite quotes like "row 1: 'Qty 16'" combine
   // a header label and a cell value that never appear verbatim together.
   // When the citation names a row/line, score the row's cells by how many
   // needle tokens each contains (numeric tokens weighted double — the
   // disputed value) and highlight the single best cell.
-  const rowHint = citation.match(/\b(?:row|line)\s+(\d+)\b/i);
-  if (rowHint) {
-    const n = parseInt(rowHint[1], 10);
+  if (hintRows.length > 0) {
     const needleTokens = parts
       .join(' ')
       .split(/\s+/)
       .filter(t => t.length >= 2);
     const tokenValue = (t: string) => (/\d/.test(t) ? 2 : 1);
-    for (const seg of segments) {
+    for (const seg of tables) {
       const cells = seg.cells ?? [];
-      if (cells.length === 0) continue;
-      // "row 1" may mean the first data row (cells row 1) or the header row
-      // (cells row 0) depending on how the LLM counts — try both.
-      for (const candidate of [n, n - 1]) {
+      for (const candidate of hintRows) {
         const rowCells = cells.filter(c => c.row === candidate);
         if (rowCells.length === 0) continue;
         let bestCell: SegmentCell | null = null;

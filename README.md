@@ -74,7 +74,7 @@ A dense, Drive/Linear-style document table: type icons, date added, status chips
 
 ### Reconciliation
 
-One click runs a multi-way match across a workspace's documents through a reasoning LLM (DeepSeek cloud or a local server), with a live "thinking" stream and stage-by-stage progress while it works. Discrepancies are flagged across **eight finding categories**: overbilling, quantity mismatch, price mismatch, missing items, extra items, unsupported charges, evidence gaps, and calculation errors.
+One click runs a multi-way match across a workspace's documents through a reasoning LLM (OpenAI or DeepSeek cloud, or a local server), with a live "thinking" stream and stage-by-stage progress while it works. Discrepancies are flagged across **eight finding categories**: overbilling, quantity mismatch, price mismatch, missing items, extra items, unsupported charges, evidence gaps, and calculation errors.
 
 ### Findings report
 
@@ -182,7 +182,7 @@ The app never talks to DocAI directly. Every document capability goes through th
    - `supplierEmails` (per-group vendor contact — verified against the actual document text afterwards),
    - `emailDrafts` (one follow-up email per supplier with findings, written in the same reasoning context as the findings — so the email can never drift from the report).
    - Findings carry strict citations: `"<file>: <location hint>: '<verbatim 5-40 char quote>' [reason: <brief why>]"` — the reason suffix is metadata, never part of the quote.
-3. **Provider routing** (`/api/reconcile`): `deepseek/<model>` → DeepSeek API (`api.deepseek.com/v1`, thinking enabled); `lmstudio/<model>` → local OpenAI-compatible server with `reasoning_effort: high`. Responses stream as SSE; reasoning deltas are forwarded live and matched to plan stages.
+3. **Provider routing** (`/api/reconcile`, via `src/lib/llm-providers.ts`): `openai/<model>` → OpenAI Responses API (`api.openai.com/v1/responses`, high reasoning effort, no output cap, reasoning summaries streamed), `deepseek/<model>` → DeepSeek API (`api.deepseek.com/v1`, thinking enabled), `gemini/<model>` → Gemini's OpenAI-compatible API, and `lmstudio/<model>` → local OpenAI-compatible server with `reasoning_effort: high`. A missing provider key fails fast with a message naming the variable. Responses stream as SSE; reasoning deltas are forwarded live and matched to plan stages.
 4. **Parse + sanitize** (`extractJSON` → `validateReport`): KPIs are clamped via `sanitizeKPIs`, incomplete findings dropped, supplier emails verified against document text (invented addresses replaced by the first real email found via regex, or dropped), email drafts shape-checked (recipient must be a verified supplier email).
 5. **Engine-derived figures**: the "Billed − Overbilled = Recommended payable" line is computed in code from the structured KPIs (the LLM never performs this arithmetic — its prose sums used to drift). File ids are stamped onto classifications from the caller's input order.
 6. **Template fill**: any supplier with findings but no valid LLM draft gets a deterministic template email, so the email card is never empty.
@@ -227,7 +227,8 @@ Open http://localhost:3000, then paste a DocAI API key when prompted — get one
 | Variable | Purpose |
 |----------|---------|
 | `SESSION_SECRET` | **Required.** Encrypts the cookie holding the user's API key — generate with `openssl rand -base64 32` |
-| `DEEPSEEK_API_KEY` | API key for the DeepSeek LLM used during reconciliation |
+| `DEEPSEEK_API_KEY` | API key for DeepSeek models used during reconciliation |
+| `OPENAI_API_KEY` | API key for OpenAI models used during reconciliation |
 | `DOCAI_BASE_URL` | Optional. Defaults to `https://api.providus.ai`; on-premises deployments point this at their own instance |
 | `LM_STUDIO_URL` | Optional: local OpenAI-compatible LLM server base URL (route `lmstudio/<model>`) |
 
@@ -235,7 +236,7 @@ No DocAI key belongs in `.env` — each user supplies their own in the app.
 
 ### Models
 
-The reconcile model selector offers DeepSeek cloud models (`deepseek/deepseek-v4-flash`, `deepseek/deepseek-v4-pro`) and any `lmstudio/<model>` served at `LM_STUDIO_URL`. Model routing lives in `src/app/api/reconcile/route.ts`; the picker list in `src/components/model-selector.tsx`.
+The reconcile model selector offers the OpenAI cloud model `openai/gpt-5.6-luna`, DeepSeek cloud models (`deepseek/deepseek-v4-flash`, `deepseek/deepseek-v4-pro`), and any `lmstudio/<model>` served at `LM_STUDIO_URL`. Model routing lives in `src/lib/llm-providers.ts`; the picker list in `src/components/model-selector.tsx`.
 
 ## Scripts
 

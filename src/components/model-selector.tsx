@@ -26,6 +26,12 @@ const GEMINI_CLOUD: ModelInfo[] = [
   { id: 'gemini/gemini-pro-latest', provider: 'gemini', name: 'Gemini Pro (latest)', available: true },
 ];
 
+// OpenAI cloud models. Keep the provider prefix in the option value so the
+// server can route the request without exposing API keys to the browser.
+const OPENAI_CLOUD: ModelInfo[] = [
+  { id: 'openai/gpt-5.6-luna', provider: 'openai', name: 'GPT-5.6 Luna', available: true },
+];
+
 export function ModelSelector({
   value,
   onChange
@@ -42,7 +48,9 @@ export function ModelSelector({
         const data = await res.json();
         if (Array.isArray(data.models)) {
           // Filter out any duplicates that appear in the hardcoded cloud lists
-          const cloudIds = new Set([...DEEPSEEK_CLOUD, ...GEMINI_CLOUD].map(m => m.id));
+          const cloudIds = new Set(
+            [...DEEPSEEK_CLOUD, ...GEMINI_CLOUD, ...OPENAI_CLOUD].map(m => m.id)
+          );
           const filtered = data.models.filter(
             (model: FetchedModel) => !cloudIds.has(model.id)
           );
@@ -70,6 +78,11 @@ export function ModelSelector({
       </optgroup>
       <optgroup label="Gemini (cloud)">
         {GEMINI_CLOUD.map(m => (
+          <option key={m.id} value={m.id}>{m.name}</option>
+        ))}
+      </optgroup>
+      <optgroup label="OpenAI (cloud)">
+        {OPENAI_CLOUD.map(m => (
           <option key={m.id} value={m.id}>{m.name}</option>
         ))}
       </optgroup>

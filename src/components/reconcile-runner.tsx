@@ -132,8 +132,7 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
     }));
 
     try {
-      // Model comes from the Files tab selector; fall back to DeepSeek V4 Flash
-      // (LM Studio support is dormant — see reconcile route's lmstudio branch)
+      // Model comes from the Files tab selector; fall back to DeepSeek V4 Flash.
       let modelId = requestedModelId;
       if (!modelId) modelId = 'deepseek/deepseek-v4-flash';
 

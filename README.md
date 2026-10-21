@@ -74,7 +74,7 @@ A dense, Drive/Linear-style document table: type icons, date added, status chips
 
 ### Reconciliation
 
-One click runs a multi-way match across a workspace's documents through a reasoning LLM (OpenAI or DeepSeek cloud, or a local server), with a live "thinking" stream and stage-by-stage progress while it works. Discrepancies are flagged across **eight finding categories**: overbilling, quantity mismatch, price mismatch, missing items, extra items, unsupported charges, evidence gaps, and calculation errors.
+One click runs a multi-way match across a workspace's documents through a reasoning LLM (OpenAI, DeepSeek or Gemini cloud, or a local server), with a live "thinking" stream and stage-by-stage progress while it works. Discrepancies are flagged across **eight finding categories**: overbilling, quantity mismatch, price mismatch, missing items, extra items, unsupported charges, evidence gaps, and calculation errors.
 
 ### Findings report
 
@@ -144,7 +144,7 @@ Three one-line flows complete the picture:
 | **Reconcile API** | `src/app/api/reconcile/route.ts` | SSE stream: calls the LLM provider, forwards reasoning deltas live, returns the sanitized report. |
 | **Reconcile engine** | `src/engine/reconcile.ts` | Pure, portable, unit-tested: builds the prompt, calls the LLM, parses + sanitizes the JSON report, derives every figure in code. |
 | **Libraries** | `src/lib/evidence-utils.ts`, `pdf-lines.ts`, `kpi-utils.ts`, `file-table.ts`, `session.ts`, `docai-proxy.ts`, `proxy-path-validation.ts`, `format-inline.ts`, `file-status.ts` | Pure logic: citation locating, line grouping, KPI math, file sorting, encrypted sessions, proxying, path allowlists. |
-| **Tests** | `src/lib/__tests__/`, `src/engine/__tests__/` | 160 `bun:test` cases — engine, citation location, line grouping, KPI derivation, prompt-injection hardening, email verification. |
+| **Tests** | `src/lib/__tests__/`, `src/engine/__tests__/` | 246 `bun:test` cases — engine, citation location, line grouping, KPI derivation, prompt-injection hardening, email verification. |
 
 ## How we use Providus's Document Intelligence Layer (DocAI)
 
@@ -222,6 +222,38 @@ bun dev
 
 Open http://localhost:3000, then paste a DocAI API key when prompted — get one from [platform.providus.ai](https://platform.providus.ai).
 
+### Quick start for users
+
+**What you need**
+
+- A **DocAI API key** from [platform.providus.ai](https://platform.providus.ai), on an account with DocAI credits. Parsing costs 1 credit per page.
+- **One** LLM key: `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` or `GEMINI_API_KEY`. You only need the one for the model you will use.
+- A `SESSION_SECRET` (any long random string: `openssl rand -base64 32`).
+
+**First run**
+
+1. `bun install`
+2. `cp .env.example .env.local`, then fill in `SESSION_SECRET` and your LLM key.
+3. `bun dev` and open http://localhost:3000.
+4. Paste your DocAI API key.
+
+After editing `.env.local`, stop and restart `bun dev`. Changes are not picked up while it runs.
+
+**Running a reconciliation**
+
+1. Create or pick a workspace.
+2. Upload the documents for one purchase: purchase order, delivery note or goods receipt, and invoice. PDFs and images (PNG, JPG, TIFF, WebP, GIF, BMP) are accepted.
+3. Wait until every file shows **parsed**.
+4. Select at least 2 parsed files and pick a model. The Reconcile button stays disabled until both are done.
+5. Click **Reconcile**. A run can take a few minutes; the thinking panel shows progress.
+6. Open the **Report** tab for findings, evidence highlights and supplier email drafts.
+
+**Good to know**
+
+- **Pick the model that matches your key.** The picker lists every model whether or not its key is set. Choosing one without a key shows an error naming the missing variable.
+- **Reports live only in this browser.** Clearing browser data deletes them, and they do not appear in another browser or on another machine. Copy anything you need to keep.
+- **OpenAI organization verification.** OpenAI models stream reasoning summaries, which some OpenAI organizations must verify before use. If a run fails with an error about verification or summaries, verify the organization in the OpenAI dashboard or use a DeepSeek or Gemini model.
+
 ### Environment variables (`.env.local`)
 
 | Variable | Purpose |
@@ -229,14 +261,15 @@ Open http://localhost:3000, then paste a DocAI API key when prompted — get one
 | `SESSION_SECRET` | **Required.** Encrypts the cookie holding the user's API key — generate with `openssl rand -base64 32` |
 | `DEEPSEEK_API_KEY` | API key for DeepSeek models used during reconciliation |
 | `OPENAI_API_KEY` | API key for OpenAI models used during reconciliation |
+| `GEMINI_API_KEY` | API key for Gemini models used during reconciliation |
 | `DOCAI_BASE_URL` | Optional. Defaults to `https://api.providus.ai`; on-premises deployments point this at their own instance |
 | `LM_STUDIO_URL` | Optional: local OpenAI-compatible LLM server base URL (route `lmstudio/<model>`) |
 
-No DocAI key belongs in `.env` — each user supplies their own in the app.
+Set at least one of `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` or `GEMINI_API_KEY`. No DocAI key belongs in `.env` — each user supplies their own in the app.
 
 ### Models
 
-The reconcile model selector offers the OpenAI cloud model `openai/gpt-5.6-luna`, DeepSeek cloud models (`deepseek/deepseek-v4-flash`, `deepseek/deepseek-v4-pro`), and any `lmstudio/<model>` served at `LM_STUDIO_URL`. Model routing lives in `src/lib/llm-providers.ts`; the picker list in `src/components/model-selector.tsx`.
+The reconcile model selector offers the OpenAI cloud model `openai/gpt-5.6-luna`, DeepSeek cloud models (`deepseek/deepseek-v4-flash`, `deepseek/deepseek-v4-pro`), Gemini cloud models (`gemini/gemini-3.1-flash-lite`, `gemini/gemini-pro-latest`), and any `lmstudio/<model>` served at `LM_STUDIO_URL`. Model routing lives in `src/lib/llm-providers.ts`; the picker list in `src/components/model-selector.tsx`.
 
 ## Scripts
 
@@ -269,6 +302,8 @@ src/
     |-- docai-proxy.ts       upstream fetch helper (x-api-key)
     |-- evidence-utils.ts    citation locating, attribution, reasons, segmentRowBox
     |-- docai-shapes.ts      unwraps DocAI's { file: ... } response envelope
+    |-- llm-providers.ts     LLM provider routing (URLs, keys, request bodies, stream parsing)
+    |-- table-text.ts        converts DocAI's HTML tables to plain rows for the prompt
     |-- pdf-lines.ts         text-layer line grouping for line-level highlights
     |-- kpi-utils.ts         KPI sanitization + payable derivation
     |-- file-table.ts        sort/search helpers for the Files table

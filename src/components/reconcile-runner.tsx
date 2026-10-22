@@ -324,7 +324,7 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
           <Card className="p-6">
             <p className="text-sm text-secondary">
               No report yet. Select 2+ parsed files in the Files tab and click{" "}
-              <strong>Reconcile N Documents</strong> to generate a report here.
+              <strong>Reconcile</strong> at least two parsed files to build a report here.
             </p>
           </Card>
         )

@@ -9,7 +9,7 @@
  *
  *   | Column 1 | Column 2 | From 04/01/2026 … |   <- sheet row 1 (header), repeated per chunk;
  *   | --- | --- | --- |                            "Column N" is DocAI's placeholder for a blank cell
- *   | 110312 | PETTY CASH | 04/01/2026 |           <- sheet row startRow, then startRow+1, …
+ *   | 100000 | PETTY CASH | 04/01/2026 |           <- sheet row startRow, then startRow+1, …
  *
  * and `coordinates` carries sheetName / startRow / startCol / endRow / endCol.
  * Cells are plain text (DocAI escapes nothing); callers render them as text,

@@ -9,7 +9,7 @@ test('parseSheetTable: headers, separator skipped, empty cells kept, text never 
     '| Code | Account Name | Date |',
     '| --- | --- | --- |',
     '|  |  |  |',
-    '| 110312 | PETTY CASH <b>x</b> | 04/01/2026 |',
+    '| 100000 | PETTY CASH <b>x</b> | 04/01/2026 |',
   ].join('\n');
   const t = parseSheetTable(md);
   expect(t.sheet).toBe('General Ledger');
@@ -17,7 +17,7 @@ test('parseSheetTable: headers, separator skipped, empty cells kept, text never 
   expect(t.rows).toEqual([
     ['Code', 'Account Name', 'Date'],
     ['', '', ''],
-    ['110312', 'PETTY CASH <b>x</b>', '04/01/2026'],
+    ['100000', 'PETTY CASH <b>x</b>', '04/01/2026'],
   ]);
   expect(parseSheetTable('no table here').rows).toEqual([]);
 });

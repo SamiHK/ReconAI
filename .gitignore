@@ -6,3 +6,6 @@ node_modules
 .env*.local
 tsconfig.tsbuildinfo
 demo-docs/**
+/data/abujhd/
+/ABUJHD/
+scripts/abujhd/__pycache__/

@@ -127,7 +127,7 @@ export function WorkspaceManager({ selectedKB, onSelect }: {
           </DialogHeader>
           <DialogFooter>
             <Button variant="ghost" onClick={() => setDeleteTarget(null)}>Cancel</Button>
-            <Button variant="destructive" onClick={deleteKB}>Delete Workspace</Button>
+            <Button variant="destructive" onClick={deleteKB}>Delete workspace</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -135,7 +135,7 @@ export function WorkspaceManager({ selectedKB, onSelect }: {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Create Workspace</DialogTitle>
+            <DialogTitle>Create workspace</DialogTitle>
             <DialogDescription>
               A workspace groups documents for reconciliation. You can upload files to it right after.
             </DialogDescription>

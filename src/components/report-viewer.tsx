@@ -148,7 +148,7 @@ export function ReportViewer({ report }: { report: ReconciliationReport }) {
 
       {/* Findings Summary */}
       <Card className="p-6">
-        <h3 className="text-h3 mb-4">Findings by Severity</h3>
+        <h3 className="text-h3 mb-4">Findings by severity</h3>
         <div className="flex gap-4 mb-6">
           <SeverityBadge label="Critical" count={criticalCount} severity="critical" active={activeSeverities.has('critical')} onClick={() => toggleSeverity('critical')} />
           <SeverityBadge label="High" count={highCount} severity="high" active={activeSeverities.has('high')} onClick={() => toggleSeverity('high')} />
@@ -203,7 +203,7 @@ export function ReportViewer({ report }: { report: ReconciliationReport }) {
       {/* Unmatched */}
       {unmatchedDocuments.length > 0 && (
         <Card className="p-6 border-warning/20">
-          <h3 className="text-h3 mb-4 text-warning">Unmatched Documents</h3>
+          <h3 className="text-h3 mb-4 text-warning">Unmatched documents</h3>
           <p className="text-sm text-secondary">
             These documents could not be grouped with any others:
           </p>
@@ -317,7 +317,7 @@ function DraftSection({ draft }: { draft: EmailDraft }) {
 function SupplierEmailCard({ drafts }: { drafts: EmailDraft[] }) {
   return (
     <Card className="p-6">
-      <h3 className="text-h3 mb-1">Supplier Emails</h3>
+      <h3 className="text-h3 mb-1">Supplier emails</h3>
       <p className="mb-4 text-xs text-secondary">
         Drafted from this reconciliation's findings. Review the recipient, then copy or send.
       </p>
@@ -533,7 +533,7 @@ function EvidenceButton({ finding, group, classifications }: {
             'sm:max-w-[calc(100vw-2rem)] sm:h-[calc(100vh-2rem)] flex flex-col overflow-y-auto',
           )}
         >
-          <DialogTitle className="text-h3 font-semibold leading-6">Evidences Mindmap</DialogTitle>
+          <DialogTitle className="text-h3 font-semibold leading-6">Evidence map</DialogTitle>
           {/* Split: orbit stays square on the left (compacts for panes); the
               pane grid slides in on the right. Single pane = full-width pane
               exactly like the old single viewer. min-h-0 lets the row shrink

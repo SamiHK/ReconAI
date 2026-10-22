@@ -505,7 +505,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                   onClick={() => onReconcile?.([...selectedIds], modelId)}
                   className={unparsedSelected === 0 && modelId ? 'bg-success text-white hover:bg-success/80' : ''}
                 >
-                  Reconcile {selectedIds.size} Documents
+                  Reconcile {selectedIds.size} documents
                 </Button>
                 {unparsedSelected > 0 && (
                   <span className="text-xs text-secondary">Only parsed files can be reconciled</span>
@@ -738,7 +738,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
             </div>
           ) : (
             <div className="space-y-3">
-              <Label>New Workspace Name</Label>
+              <Label>Workspace name</Label>
               <Input 
                 placeholder="Workspace name" 
                 value={uploadNewName} 

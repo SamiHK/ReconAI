@@ -58,11 +58,12 @@ export function Dashboard() {
         <button
           type="button"
           onClick={() => setTab('files')}
-          className="flex items-center justify-center px-3 py-5 text-h2 font-semibold cursor-pointer text-foreground transition-opacity hover:opacity-70 md:justify-start md:px-5"
+          className="flex flex-col items-center px-3 py-5 cursor-pointer text-foreground transition-opacity hover:opacity-70 md:items-start md:px-5"
           title="Go to Files"
         >
-          <span className="md:hidden">R</span>
-          <span className="hidden md:inline">ReconAI</span>
+          <span className="font-display text-h2 md:hidden">R</span>
+          <span className="hidden font-display text-h2 md:inline">ReconAI</span>
+          <span className="hidden text-[11px] font-medium tracking-wide text-muted-foreground md:inline">by providus</span>
         </button>
         <nav className="flex flex-col gap-1 px-3">
           {selectedKB && (

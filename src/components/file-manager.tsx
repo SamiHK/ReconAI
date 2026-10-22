@@ -34,12 +34,18 @@ import { fileKind, formatFileDate, sortFiles, type FileSortKey, type SortDir } f
 import { ModelSelector } from './model-selector';
 import { ProgressiveFluxLoader } from './ui/progressive-flux-loader';
 import { EvidencePdfViewer } from './ui/evidence-pdf-viewer';
+import { SheetPreview } from './ui/sheet-preview';
 import type { MindmapFileNode } from '@/lib/evidence-utils';
 
 interface FileItem extends FileWithProcessing {
   id: string;
   filename: string;
+  content_type?: string;
   created_at: string;
+}
+
+function isSpreadsheet(f: FileItem | null | undefined): boolean {
+  return !!f && (/spreadsheet|csv/.test(f.content_type ?? '') || /\.(xlsx?|csv)$/i.test(f.filename));
 }
 
 // DocAI only accepts PDFs and images (confirmed with the platform)
@@ -419,12 +425,10 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
   // Inline single-pane PDF preview (files tab). id 0 is only used as a React
   // key — the viewer keys off fileId; no citations here, so it renders the
   // full-document stack with no highlights.
-  const previewNode: MindmapFileNode | null = (() => {
-    const pf = files.find(f => f.id === previewFileId);
-    return pf
-      ? { id: 0, title: pf.filename, role: 'FILE', fileId: pf.id, citations: [] }
-      : null;
-  })();
+  const previewFile = files.find(f => f.id === previewFileId) ?? null;
+  const previewNode: MindmapFileNode | null = previewFile
+    ? { id: 0, title: previewFile.filename, role: 'FILE', fileId: previewFile.id, citations: [] }
+    : null;
 
   // The preview fills the viewport from its own position down to ~16px above
   // the bottom — measured, so it never overflows regardless of what sits
@@ -836,11 +840,21 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
             }`}
             style={previewWidth ? { width: `${previewWidth}px` } : undefined}
           >
-            <EvidencePdfViewer
-              file={previewNode}
-              onClose={() => setPreviewFileId(null)}
-              style={previewHeight ? { height: previewHeight } : undefined}
-            />
+            {isSpreadsheet(previewFile) ? (
+              <SheetPreview
+                key={previewFile!.id}
+                fileId={previewFile!.id}
+                filename={previewFile!.filename}
+                onClose={() => setPreviewFileId(null)}
+                style={previewHeight ? { height: previewHeight } : undefined}
+              />
+            ) : (
+              <EvidencePdfViewer
+                file={previewNode}
+                onClose={() => setPreviewFileId(null)}
+                style={previewHeight ? { height: previewHeight } : undefined}
+              />
+            )}
           </div>
         </>
       )}

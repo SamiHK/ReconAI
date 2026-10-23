@@ -60,29 +60,32 @@ export function Dashboard() {
       <aside className="sticky top-0 z-30 flex h-screen w-16 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:w-60">
         <div className="flex flex-col gap-1 px-3 pt-6 pb-2 md:px-4">
           <BrandLogo className="hidden md:block" />
-          <BrandLogo width={32} height={32} className="md:hidden" />
           <span className="hidden text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:inline">ReconAI</span>
         </div>
-        <nav className="flex flex-col gap-1 px-2 pt-4 md:px-3" aria-label="Sections">
-          {([
-            { key: 'files', label: 'Files', Icon: FileText },
-            { key: 'report', label: 'Report', Icon: FileBarChart },
-          ] as const).map(({ key, label, Icon }) => (
-            <button
-              key={key}
-              type="button"
-              aria-current={tab === key ? 'page' : undefined}
-              onClick={() => { if (key === 'report') setReconcileRequest(null); setTab(key); }}
-              className={cn(
-                'flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium transition-colors',
-                tab === key ? 'bg-primary text-primary-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
-              )}
-            >
-              <Icon className="size-4 shrink-0" />
-              <span className="hidden md:inline">{label}</span>
-            </button>
-          ))}
-        </nav>
+        {selectedKB && (
+          <nav className="flex flex-col gap-1 px-2 pt-4 md:px-3" aria-label="Sections">
+            {([
+              { key: 'files', label: 'Files', Icon: FileText },
+              { key: 'report', label: 'Report', Icon: FileBarChart },
+            ] as const).map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                type="button"
+                aria-label={label}
+                title={label}
+                aria-current={tab === key ? 'page' : undefined}
+                onClick={() => { if (key === 'report') setReconcileRequest(null); setTab(key); }}
+                className={cn(
+                  'flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium transition-colors',
+                  tab === key ? 'bg-primary text-primary-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                <span className="hidden md:inline">{label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
 
         {/* Account menu opens upward */}
         <div className="mt-auto px-2 pb-4 md:px-3">

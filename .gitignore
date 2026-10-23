@@ -10,3 +10,4 @@ demo-docs/**
 /ABUJHD/
 scripts/abujhd/__pycache__/
 /data/*.zip
+.venv/

@@ -6,7 +6,7 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import numpy as np
 from PIL import Image
 import common
-from common import ascii_digits, norm_text, find_amounts, find_dates, load_json, save_json, _days
+from common import ascii_digits, norm_text, find_amounts, find_dates, load_json, save_json, _days, total_flags
 
 # --- Statement (bank-card grid) from the PDF's own text layer ---------------------------
 _ROW = re.compile(
@@ -156,17 +156,12 @@ def group_page(segs):
     return big
 
 
-_TOTAL_KW = re.compile(r"(total|net|grand|purchase amount|amount|الإجمالي|إجمالي|الصافي|المجموع|المبلغ|مبلغ الشراء)", re.I)
 _APPROVAL = re.compile(r"approval[^\d]{0,20}(\d{5,8})", re.I)
 _INVOICE = re.compile(r"(?:\binv(?:oice)?\.?\s*(?:no|#|num|رقم)?[.:\s]*|رقم الفاتورة[:\s]*|bill no\.?[:\s]*)(?=[A-Z0-9\-/]*\d)([A-Z0-9][A-Z0-9\-/]{3,})", re.I)
 
 def derive_fields(text, segs):
     t = ascii_digits(text)
-    flags = {}  # value -> total_candidate, OR-ed over every occurrence, in first-appearance order
-    for m in re.finditer(r"(?<![\d.])(\d{1,3}(?:,\d{3})+\.\d{2}|\d+\.\d{2})(?!\d)", t):
-        v = float(m.group(1).replace(",", ""))
-        before = t[max(0, m.start() - 40):m.start()]
-        flags[v] = flags.get(v, False) or bool(_TOTAL_KW.search(before))
+    flags = total_flags(t)  # value -> total_candidate, in first-appearance order
     amounts = [{"value": v, "total_candidate": f} for v, f in flags.items()]
     heads = [s["text"].split("\n")[0][:60] for s in segs if s.get("type") in ("title", "header") and s["text"]]
     first = text.strip().split("\n")[0][:60] if text.strip() else ""

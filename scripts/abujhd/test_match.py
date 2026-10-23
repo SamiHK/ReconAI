@@ -201,6 +201,72 @@ def test_multi_document_notes_go_to_review():
     clean2 = G("c2", 1, [41.0], [], "MAZA REST"); clean2["ids"] = ["c2"]; clean2["boxes"] = [(1, None)]
     assert "two documents" in collapse_fragments([clean2, multi2])[0]["notes"]
 
+from b_match import second_pass
+
+def _left(gs):
+    for g in gs: g.setdefault("ids", [g["id"]]); g.setdefault("boxes", [(g["page"], None)])
+    return gs
+
+def test_second_pass_split_payment():
+    rows = [R("a", 33.0, "2026-09-01", "QALAT REST"), R("b", 8.0, "2026-09-01", "QALAT REST"), R("c", 8.0, "2026-09-01", "OTHER SHOP")]
+    g = _left([G("g1", 1, [41.0], ["2026-09-01"], "Qalat")])[0]
+    links, review = second_pass([g], rows, {"g1": None}, {})
+    assert links["g1"] == ["a", "b"], links          # same merchant string, same day, exact sum
+    # a leftover row already named in a review list, or already linked, is never consumed
+    links, review = second_pass([g], rows, {"g1": None}, {"zz": [("b", 3)]})
+    assert links["g1"] is None, links
+    links, review = second_pass([g], rows, {"g1": None, "g2": "a"}, {})
+    assert links["g1"] is None, links
+    rows4 = [R("a", 25.0, "2026-09-19", "PURE OIL"), R("b", 45.0, "2026-09-19", "PURE OIL")]
+    g4 = _left([G("g4", 54, [70.02], ["2026-09-19"], "Purein")])[0]
+    assert second_pass([g4], rows4, {"g4": None}, {})[0]["g4"] == ["a", "b"]     # sum within 0.05 of the total, like pass 1
+
+def test_second_pass_amount_tolerance():
+    rows = [R("a", 172.0, "2026-09-09", "ALMAQHAWI IND"), R("b", 500.0, "2026-09-09", "X")]
+    g = _left([G("g1", 1, [172.5], ["2026-09-09"], "Ibrahim Al-Mughawi")])[0]
+    links, _ = second_pass([g], rows, {"g1": None}, {})
+    assert links["g1"] == "a", links                  # same day, 0.50 apart, unique both ways
+    rows2, _ = assign_statuses(rows, [g], links, {}, tie_out_ledger(rows, []), [])
+    assert {r["ref"]: r["status"] for r in rows2}["a"] == "AMOUNT_MISMATCH"   # flagged, not promoted
+    for bad in ([R("a", 175.51, "2026-09-09", "Y")],                          # 3.01 apart
+                [R("a", 172.0, "2026-09-10", "Y")],                           # other day
+                [R("a", 172.0, "2026-09-09", "Y"), R("a2", 171.0, "2026-09-09", "Z")]):   # two rows within 3.00: ambiguous
+        assert second_pass([g], bad, {"g1": None}, {})[0]["g1"] is None, bad
+    # two leftover receipts within 3.00 of the same row: ambiguous the other way
+    g2 = _left([G("g2", 2, [171.0], ["2026-09-09"], "Other")])[0]
+    assert second_pass([g, g2], rows, {"g1": None, "g2": None}, {})[0]["g1"] is None
+    # a NON-leftover row (linked or in review) within tolerance on the same day still makes the receipt ambiguous
+    rows3 = [R("a", 172.0, "2026-09-09", "Y"), R("z", 171.5, "2026-09-09", "Z")]
+    assert second_pass([g], rows3, {"g1": None, "gz": "z"}, {})[0]["g1"] is None
+    assert second_pass([g], rows3, {"g1": None}, {"gq": [("z", 3)]})[0]["g1"] is None
+
+def test_second_pass_no_total_to_review():
+    rows = [R("a", 93.0, "2026-09-08", "AL OTHAIM MARKETS COMPANY"), R("b", 6.0, "2026-09-08", "ASDAF")]
+    g = _left([G("g1", 26, [], ["2026-09-08"], "Othaim", fields={"merchant": "أسواق العثيم / Othaim", "date": "2026-09-08", "total": None, "card_slip_amount": None})])[0]
+    links, review = second_pass([g], rows, {"g1": None}, {})
+    assert links["g1"] is None and review["g1"] == [("a", 0)], (links, review)   # a suggestion for the human, not a match
+    rows2, rc = assign_statuses(rows, [g], links, review, tie_out_ledger(rows, []), [])
+    assert {r["ref"]: r["status"] for r in rows2}["a"] == "REVIEW" and rc[0]["status"] == "REVIEW"
+    # two same-merchant rows that day: no suggestion
+    assert "g1" not in second_pass([g], rows + [R("c", 20.0, "2026-09-08", "AL OTHAIM MARKETS")], {"g1": None}, {})[1]
+
+def test_split_link_statuses():
+    rows = [R("a", 33.0, "2026-09-01", "QALAT REST"), R("b", 8.0, "2026-09-01", "QALAT REST")]
+    g = _left([G("g1", 1, [41.0], ["2026-09-01"], "Qalat")])[0]; g["box"] = [0, 0, 10, 10]
+    rows2, rc = assign_statuses(rows, [g], {"g1": ["a", "b"]}, {}, tie_out_ledger(rows, []), [])
+    assert [r["status"] for r in rows2] == ["MATCHED", "MATCHED"] and "split" in rows2[0]["reason"], rows2
+    assert rc[0]["status"] == "LINKED" and rc[0]["ref"] == "a" and rc[0]["refs"] == ["a", "b"]
+
+def test_receipt_amounts_reranks_unhealed_totals():
+    g = {"id": "u", "page": 1, "pages": [1], "fields": None, "dates": [], "merchant_candidates": [],
+         "text": "Amount 560.87 VAT 84.13 Total 645.00",
+         "amounts": [{"value": 560.87, "total_candidate": True}, {"value": 645.0, "total_candidate": False}]}
+    assert receipt_amounts(g) == {645.0}
+    g["text"] = "645.00 SAR\nالمجموع قبل الضريبة\n560.87 SAR"      # no total keyword survives: every amount is a candidate
+    assert receipt_amounts(g) == {645.0, 560.87}
+    g["ids"] = ["u", "v"]                                            # a merged record keeps its merged flags (head text is partial)
+    assert receipt_amounts(g) == {560.87}
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

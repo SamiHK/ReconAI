@@ -163,6 +163,18 @@ def test_apply_fields_and_overrides():
     assert g["dates"][0] == "2026-09-02" and g["merchant_candidates"][0] == "MAZA"
     assert link_candidates(g, [{"ref": "A", "amount": 41.0, "date": "2026-09-01", "kind": "purchase"}]) == ["A"]
 
+def test_strong_total_keyword_beats_amount():
+    f = derive_fields("Amount 560.87 VAT 84.13 Total 645.00", [])
+    assert [a["value"] for a in f["amounts"] if a["total_candidate"]] == [645.0]
+    assert derive_fields("Amount 10.00", [])["amounts"] == [{"value": 10.0, "total_candidate": True}]   # weak keyword still counts alone
+    # a total-family keyword qualified as before-tax/subtotal flags nothing (real fuel receipt shape)
+    f = derive_fields("Diesel price 1.79\n645.00 SAR\n1 x 645.00 SAR\nالمجموع قبل الضريبة\n560.87 SAR\nالضريبة 15%\n84.13 SAR", [])
+    assert [a["value"] for a in f["amounts"] if a["total_candidate"]] == []
+    from common import total_flags
+    assert total_flags("Net 5.00 x 9.99") == {5.0: True, 9.99: False}
+    assert total_flags("Subtotal 5.00 Total 9.99") == {5.0: False, 9.99: True}
+    assert total_flags("قبل الضريبة 560.87 الإجمالي 645.00") == {560.87: False, 645.0: True}   # window stops at the previous amount
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

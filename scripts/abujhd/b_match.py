@@ -3,7 +3,7 @@
 import argparse, re, sys, pathlib, unicodedata
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import common
-from common import load_json, save_json, _days
+from common import load_json, save_json, _days, total_flags
 
 ALIASES = {"ajmy": "ajmi", "ajmi": "ajmi", "asdaf": "اسواق", "اسواق": "اسواق", "أسواق": "اسواق", "masdarusa": "masdar", "masdarman": "masdar", "masdarjana": "masdar",
            "almuhitai": "almuhit", "muhit": "almuhit", "alfares": "fares", "al-fares": "fares"}
@@ -28,7 +28,11 @@ def receipt_amounts(g):
     f = g.get("fields") or {}
     healed = {round(v, 2) for v in (f.get("total"), f.get("card_slip_amount")) if isinstance(v, (int, float))}
     if healed: return healed
-    totals = {a["value"] for a in g["amounts"] if a["total_candidate"]}
+    # an unmerged record re-ranks its totals from its own text (groups.json may predate the keyword rules); a merged one keeps its merged flags
+    if g.get("text") and len(g.get("ids") or [1]) == 1:
+        totals = {round(v, 2) for v, t in total_flags(g["text"]).items() if t}
+    else:
+        totals = {a["value"] for a in g["amounts"] if a["total_candidate"]}
     return totals or {a["value"] for a in g["amounts"]}
 
 def _dates(g):
@@ -156,6 +160,41 @@ def match_receipts(groups, rows, overrides):
 
 def _r2(x): return round(x, 2)
 
+def _refs(v): return v if isinstance(v, list) else [v] if v else []
+
+def second_pass(groups, rows, links, review, tol=3.0):
+    """Leftovers only: rows nobody linked or listed for review, groups with no link and no review entry. Pass 1 is never touched.
+    1) split payment: two same-day rows with the identical statement merchant string summing exactly to a receipt total -> both linked.
+    2) near amount: one row within `tol` SAR on the receipt's date, unique both ways -> linked (assign_statuses shows AMOUNT_MISMATCH).
+    3) no total: a healed receipt with merchant+date but no amount and one same-day row whose merchant overlaps -> review suggestion."""
+    links, review = dict(links), dict(review)
+    taken = {r for v in links.values() for r in _refs(v)} | {r for c in review.values() for r, _ in c}
+    left_rows = [r for r in rows if r["kind"] == "purchase" and r["ref"] not in taken]
+    left = [g for g in groups if not links.get(g["id"]) and g["id"] not in review]
+    same_day = lambda g, r: r["date"] in _dates(g)
+    for g in left:
+        for T in receipt_amounts(g):
+            c = [r for r in left_rows if same_day(g, r)]
+            pairs = [(a, b) for i, a in enumerate(c) for b in c[i + 1:] if a["merchant"] == b["merchant"] and abs(_r2(a["amount"] + b["amount"]) - T) <= 0.05]
+            if len(pairs) == 1:
+                a, b = pairs[0]; links[g["id"]] = [a["ref"], b["ref"]]; left_rows = [r for r in left_rows if r not in (a, b)]; break
+    left = [g for g in left if not links.get(g["id"])]
+    near = lambda g, r: same_day(g, r) and _amount_diff(g, r) <= tol
+    all_rows = [r for r in rows if r["kind"] == "purchase"]
+    for g in left:   # unique both ways against EVERY same-day row/group, not only leftovers: a taken near-twin means ambiguity
+        c = [r for r in left_rows if near(g, r)]
+        if len(c) == 1 and sum(near(g, r) for r in all_rows) == 1 and sum(near(h, c[0]) for h in groups) == 1:
+            links[g["id"]] = c[0]["ref"]; left_rows.remove(c[0])
+    left = [g for g in left if not links.get(g["id"])]
+    for g in left:
+        f = g.get("fields") or {}
+        if receipt_amounts(g) or not (f.get("merchant") and f.get("date")): continue
+        real = lambda s: norm_merchant(s) - GENERIC - {"اسواق"}   # "markets" is generic here: the ASDAF alias maps to it
+        toks = real(f["merchant"])
+        c = [r for r in left_rows if r["date"] == f["date"] and (toks & real(r["merchant"]) or _prefixes(toks) & _prefixes(real(r["merchant"])))]
+        if len(c) == 1: review[g["id"]] = [(c[0]["ref"], 0)]; left_rows.remove(c[0])
+    return links, review
+
 def tie_out_ledger(statement, ledger, month="2026-09"):
     led = [l for l in ledger if l["month"] == month]
     loads = [r for r in statement if r["kind"] == "load"]; atm = [r for r in statement if r["kind"] == "atm"]; purch = [r for r in statement if r["kind"] == "purchase"]
@@ -208,8 +247,8 @@ def assign_statuses(statement, groups, links, review, tieout, ledger):
                       "amount": l["debit"] or l["credit"], "relation": relation}
     by_id = {g["id"]: g for g in groups}
     by_ref = {}
-    for gid, ref in links.items():
-        if ref: by_ref.setdefault(ref, []).append(gid)
+    for gid, v in links.items():
+        for ref in _refs(v): by_ref.setdefault(ref, []).append(gid)
     review_refs = {r for cands in review.values() for r, _ in cands}
     rows = []
     for r in statement:
@@ -218,6 +257,9 @@ def assign_statuses(statement, groups, links, review, tieout, ledger):
             row["status"] = tieout["row_status"].get(r["ref"], "UNEXPLAINED")
             row["ledger_code"] = tieout["row_ledger"].get(r["ref"]) if row["status"] == "TIED" else None
             row["reason"] = f"tied to ledger {row['ledger_code']}" if row["ledger_code"] else "no ledger top-up/withdrawal matches this row"
+        elif row["receipt_ids"] and isinstance(links.get(row["receipt_ids"][0]), list):
+            g = by_id[row["receipt_ids"][0]]; parts = [next(x for x in statement if x["ref"] == ref)["amount"] for ref in links[g["id"]]]
+            row["status"] = "MATCHED"; row["reason"] = f"receipt {g['id']} p{g['page']} (split payment: {' + '.join(f'{p:.2f}' for p in parts)})"
         elif row["receipt_ids"]:
             g = next(g for g in groups if g["id"] == row["receipt_ids"][0])
             diff = _amount_diff(g, r)
@@ -234,10 +276,10 @@ def assign_statuses(statement, groups, links, review, tieout, ledger):
     cite_by_ref = {row["ref"]: row["citations"] for row in rows}
     receipts = []
     for g in groups:
-        ref = links.get(g["id"])
+        refs = _refs(links.get(g["id"])); ref = refs[0] if refs else None
         st = "LINKED" if ref else "REVIEW" if g["id"] in review else "ORPHAN"
         rc = cite_by_ref.get(ref) or {}
-        receipts.append({**g, "ref": ref, "status": st, "review": review.get(g["id"], []),
+        receipts.append({**g, "ref": ref, "refs": refs, "status": st, "review": review.get(g["id"], []),
                          "citations": {"receipt": _receipt_cites(g), "statement": rc.get("statement"), "ledger": rc.get("ledger")},
                          "reason": "linked" if ref else "ambiguous or weak candidates" if st == "REVIEW" else "no statement row with this amount (cash purchase? wrong total?)"})
     return rows, receipts
@@ -250,6 +292,7 @@ def main():
     overrides = load_json(common.DATA / "overrides.json") if (common.DATA / "overrides.json").exists() else {}
     groups = collapse_fragments(collapse_card_slips(groups))
     links, review = match_receipts(groups, statement, overrides)
+    links, review = second_pass(groups, statement, links, review)
     tieout = tie_out_ledger(statement, ledger, cfg["month"])
     rows, receipts = assign_statuses(statement, groups, links, review, tieout, ledger)
     import collections

@@ -62,7 +62,7 @@ STATUS = {
     "REVIEW": ("Needs a decision", "?", "var(--rev)"),
     "UNEXPLAINED": ("Not in ledger", "!", "var(--warn)"), "AMOUNT_MISMATCH": ("Amounts differ", "!", "var(--warn)"),
 }
-HEX = {"var(--ok)": "#0A7F3F", "var(--bad)": "#B42318", "var(--rev)": "#554BC5", "var(--warn)": "#A15C00", "var(--neutral)": "#8C8C8C"}
+HEX = {"var(--ok)": "#0A7F3F", "var(--bad)": "#B42318", "var(--rev)": "#554BC5", "var(--warn)": "#A15C00", "var(--neutral)": "#71717A"}
 
 def esc(s): return "" if s is None else html.escape(str(s))
 def money(x): return f"{x:,.2f}" if isinstance(x, (int, float)) else ""
@@ -91,8 +91,8 @@ def _mix(a, b, t):
     return "#%02X%02X%02X" % tuple(round(a[i] + (b[i] - a[i]) * t) for i in range(3))
 
 def ramp(t):
-    """Sequential blue, light to navy, for a 0..1 share."""
-    return _mix("#D6E4F3", "#2F6DB2", t * 2) if t < .5 else _mix("#2F6DB2", "#033659", (t - .5) * 2)
+    """Sequential purple, light to deep, for a 0..1 share."""
+    return _mix("#DAD6F5", "#7368E6", t * 2) if t < .5 else _mix("#7368E6", "#4239A9", (t - .5) * 2)
 
 def status_bars(purchases):
     order = ["MATCHED", "REVIEW", "MISSING_RECEIPT", "AMOUNT_MISMATCH"]
@@ -121,7 +121,7 @@ def waterfall(t):
     steps = [("Card loads", 0, loads, "total"), ("Purchases", 0, purch, "up"), ("ATM cash", purch, atm, "up"),
              ("Card spend", 0, spend, "total"), ("Gap", min(spend, roll), abs(gap), "gap"), ("Ledger roll-up", 0, roll, "total")]
     top = max(loads, roll, spend) * 1.15; W, H, pad = 620, 220, 34; bw = (W - 20) / len(steps) - 18
-    fill = {"total": "#8C8C8C", "up": "#2F6DB2", "gap": "#A15C00"}
+    fill = {"total": "#71717A", "up": "#554BC5", "gap": "#A15C00"}
     out = [f'<svg viewBox="0 0 {W} {H}" width="100%" role="img" aria-label="Tie-out bridge from card loads to the ledger roll-up">']
     for i, (name, base, val, kind) in enumerate(steps):
         x = 10 + i * ((W - 20) / len(steps)); y1 = H - pad - (base + val) / top * (H - pad - 20); h = max(val / top * (H - pad - 20), 1)
@@ -129,7 +129,7 @@ def waterfall(t):
         out.append(f'<text x="{x+bw/2:.1f}" y="{y1-6:.1f}" font-size="11" font-weight="600" text-anchor="middle" style="fill:var(--ink)">{money(val)}</text>')
         out.append(f'<text x="{x+bw/2:.1f}" y="{H-pad+16}" font-size="11" text-anchor="middle" style="fill:var(--mute)">{name}</text>')
     out.append(f'<line x1="0" x2="{W}" y1="{H-pad}" y2="{H-pad}" stroke="#E0E0E0"/></svg>')
-    legend = f'<div class=legend><span><i style="background:#2F6DB2"></i>card spend parts</span><span><i style="background:#A15C00"></i>unexplained gap · {money(gap)} SAR</span><span><i style="background:#8C8C8C"></i>totals</span></div>'
+    legend = f'<div class=legend><span><i style="background:#554BC5"></i>card spend parts</span><span><i style="background:#A15C00"></i>unexplained gap · {money(gap)} SAR</span><span><i style="background:#71717A"></i>totals</span></div>'
     table = '<details><summary>Table</summary><table><tr><th>Step</th><th class=num>SAR</th></tr>' + "".join(f'<tr><td>{n}</td><td class=num>{money(v)}</td></tr>' for n, _, v, _ in steps) + '</table></details>'
     return "".join(out) + legend + table
 
@@ -152,7 +152,7 @@ def merchants(purchases, top_n=10):
         share = ev / tot if tot else 0; y = i * rowh + 4; w = (W - lab - 90) * tot / mx
         out.append(f'<text x="{lab-8}" y="{y+15}" font-size="12" text-anchor="end" style="fill:var(--ink)">{esc(name[:26])}</text>')
         out.append(f'<rect x="{lab}" y="{y+3}" width="{max(w,2):.1f}" height="{rowh-8}" rx="4" fill="{ramp(share)}"><title>{esc(name)}: {money(tot)} SAR over {n} rows, {share:.0%} evidenced</title></rect>')
-        out.append(f'<text x="{lab+w+6:.1f}" y="{y+15}" font-size="11" style="fill:var(--ink)" font-variant-numeric="tabular-nums">{money(tot)} <tspan fill="#8C8C8C">· {share:.0%}</tspan></text>')
+        out.append(f'<text x="{lab+w+6:.1f}" y="{y+15}" font-size="11" style="fill:var(--ink)" font-variant-numeric="tabular-nums">{money(tot)} <tspan fill="#71717A">· {share:.0%}</tspan></text>')
     out.append('</svg>')
     legend = '<div class=legend><span>shade = share of the merchant\'s spend with a matched receipt:</span><span><i style="background:' + ramp(0) + '"></i>0%</span><span><i style="background:' + ramp(.5) + '"></i>50%</span><span><i style="background:' + ramp(1) + '"></i>100%</span></div>'
     table = '<details><summary>Table</summary><table><tr><th>Merchant</th><th class=num>Rows</th><th class=num>SAR</th><th class=num>Evidenced</th></tr>' + "".join(f'<tr><td>{esc(n)}</td><td class=num>{v[2]}</td><td class=num>{money(v[0])}</td><td class=num>{(v[1]/v[0] if v[0] else 0):.0%}</td></tr>' for n, v in head) + '</table></details>'

@@ -459,6 +459,26 @@ def test_split_payment_settles_review_rows_and_elimination_follows():
     links, review = match_receipts([asdaf, multi], rows, {}); links, review = second_pass([asdaf, multi], rows, links, review)
     assert links["asdaf"] == ["a44", "a45"] and links["multi"] is None and review == {"multi": [("d30", 5)]}, (links, review)
 
+def test_healer_dated_receipt_on_another_day_is_no_bare_amount_candidate():
+    # p73-g1 (24.00, healer date 28/09) held the 19/09 24.00 row in REVIEW on amount alone; p59-g1 (24.15, 19/09, same shop) then links by near-amount
+    row = R("r", 24.0, "2026-09-19", "ahmed alrahiman estALAOGEER RD", time="07:38:23")
+    far = _left([G("far", 73, [24.0], ["2026-09-28"], "مؤسسة تموينات عارف", fields={"merchant": "مؤسسة تموينات عارف", "date": "2026-09-28", "total": 24.0})])[0]
+    close = _left([G("close", 59, [24.15], ["2026-09-19"], "AHMED SALEH AL RAHIMAN SANITARY WARE EST.", fields={"merchant": "AHMED SALEH AL RAHIMAN SANITARY WARE EST.", "date": "2026-09-19", "total": 24.15})])[0]
+    assert score(far, row) == 0
+    assert score(G("undated", 1, [24.0], [], "xyz"), row) == 3              # no date at all: still the bare-amount review candidate
+    assert score(G("ocr", 1, [24.0], ["2026-09-28"], "xyz"), row) == 3       # an unhealed OCR date is not trusted enough to rule the receipt out
+    assert score(G("ocrh", 1, [24.0], ["2026-09-28"], "xyz", fields={"merchant": "xyz", "date": None, "total": 24.0}), row) == 3   # healed, but no date read
+    links, review = match_receipts([far, close], [row], {})
+    assert "far" not in review and links["close"] is None, (links, review)
+    links, review = second_pass([far, close], [row], links, review)
+    assert links["close"] == "r" and links["far"] is None and not review, (links, review)
+    # a same-day 25.00 row already taken by another shop's split payment is within 3.00 too, but only the 24.00 row names this shop
+    twin = R("t", 25.0, "2026-09-19", "PURE OIL COMPANY", time="18:24:19")
+    links, review = second_pass([far, close], [row, twin], {"far": None, "close": None, "oil": ["t", "x"]}, {})
+    assert links["close"] == "r", (links, review)
+    nameless = _left([G("nameless", 60, [24.15], ["2026-09-19"], "Somebody Else", fields={"merchant": "Somebody Else", "date": "2026-09-19", "total": 24.15})])[0]; nameless["confidence"] = 0.95
+    assert second_pass([nameless], [row, twin], {"nameless": None, "oil": ["t", "x"]}, {})[0]["nameless"] is None   # no name support: still ambiguous
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

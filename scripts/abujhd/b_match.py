@@ -157,6 +157,7 @@ def score(g, row):
     ds = [_days(x, row["date"]) for d in _dates(g) for x in _date_readings(d, ry)]
     support = 2 if 0 in ds else 1 if 1 in ds else 0
     support += min(2, len(_overlap(g, row)))
+    if s == 3 and not support and (g.get("fields") or {}).get("date"): return 0   # the healer dated it on another day and nothing else agrees: not this row's receipt (p73-g1 vs the 19/09 row)
     return s + support if s == 3 or support else 0  # a 5-halala drift alone is not a candidate: needs date or merchant support
 
 _MULTI_DOC = re.compile(r"more than one|multiple documents|two documents|two receipts|separate receipts", re.I)
@@ -255,7 +256,8 @@ def second_pass(groups, rows, links, review, tol=3.0):
     1) split payment: two same-day unlinked rows (leftover or parked in a review list) with the identical statement merchant string
        summing exactly to an unlinked receipt's total -> both linked (p10-g2: 10.00 + 10.00 = 20.00).
     1b) elimination: a review group whose candidate list the claims above shrank to one row of score >= 4 that nobody else lists -> linked.
-    2) near amount: one row within `tol` SAR on the receipt's date, unique both ways -> linked (assign_statuses shows AMOUNT_MISMATCH).
+    2) near amount: one row within `tol` SAR on the receipt's date, unique both ways -> linked (assign_statuses shows AMOUNT_MISMATCH);
+       a taken near-twin means ambiguity unless the one leftover candidate is also the only twin that names the shop (p59: 24.15 vs 24.00 and a 25.00 of another shop).
     3) no total: a healed receipt with merchant+date but no amount and one same-day row whose merchant overlaps -> review suggestion."""
     links, review = dict(links), {k: list(v) for k, v in review.items()}
     by_ref = {r["ref"]: r for r in rows}; by_id = {g["id"]: g for g in groups}; n0 = {gid: len(c) for gid, c in review.items()}
@@ -285,14 +287,16 @@ def second_pass(groups, rows, links, review, tol=3.0):
     same_day = _same_day
     real = lambda s: norm_merchant(s) - GENERIC - {"اسواق"}   # "markets" is generic here: the ASDAF alias maps to it
     close = lambda g, r: same_day(g, r) and _amount_diff(g, r) <= tol   # ambiguity is judged on this alone, support or not
-    def near(g, r):   # a candidate link: close, within 10% of the row, and the merchant overlaps or the healer was confident
-        if not (close(g, r) and _amount_diff(g, r) <= 0.10 * r["amount"]): return False
+    def names(g, r):   # the receipt names the row's shop
         A, B = real_merchant_tokens(g), real(r["merchant"])
-        return bool(A & B or _prefixes(A) & _prefixes(B) or (g.get("confidence") or 0) >= 0.7)
+        return bool(A & B or _prefixes(A) & _prefixes(B))
+    def near(g, r):   # a candidate link: close, within 10% of the row, and the merchant overlaps or the healer was confident
+        return close(g, r) and _amount_diff(g, r) <= 0.10 * r["amount"] and (names(g, r) or (g.get("confidence") or 0) >= 0.7)
     all_rows = [r for r in rows if r["kind"] == "purchase"]
     for g in left:   # unique both ways against EVERY same-day row/group, not only leftovers: a taken near-twin means ambiguity
         c = [r for r in left_rows if close(g, r) and _amount_diff(g, r) <= 0.10 * r["amount"]]
-        if len(c) == 1 and sum(close(g, r) for r in all_rows) == 1 and sum(close(h, c[0]) for h in groups) == 1:
+        twins = [r for r in all_rows if close(g, r)]
+        if len(c) == 1 and (len(twins) == 1 or [r for r in twins if names(g, r)] == c) and sum(close(h, c[0]) for h in groups) == 1:
             if near(g, c[0]): links[g["id"]] = c[0]["ref"]
             else: review[g["id"]] = [(c[0]["ref"], 0)]   # unique but unsupported: a human decides, never a silent miss
             left_rows.remove(c[0])

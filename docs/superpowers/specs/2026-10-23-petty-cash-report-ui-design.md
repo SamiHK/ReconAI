@@ -315,8 +315,10 @@ URLs come from `imageUrl(kbId, path)` = `/api/petty-cash/${kbId}/${path}`.
 ### Ledger source
 
 The same `LedgerLines` table the Ledger tab uses (Code, Date, Debit, Credit, Text, Status) over `report.ledger`
-filtered to `line.month === meta.month`. Every line whose `code === ledger.code` gets `bg-primary/10`; the first is
-scrolled into view (`block: 'center'`) when the tab opens. Above it one line: `{cell} · {code} · {money(amount)} · {relation}` ("rolled-up" renders as
+filtered to `line.month === meta.month`. Every line whose `code === ledger.code` gets `bg-primary/10` and
+`aria-current`; when the tab opens the first is scrolled to the centre of the pane body only (the nearest
+`data-scroll-container`), never the page, because `scrollIntoView` would move the document and push the KPI tiles out
+of view. Above it one line: `{cell} · {code} · {money(amount)} · {relation}` ("rolled-up" renders as
 "this row is rolled up into the line below", "tied" as "this row is tied to the line below").
 
 ### Layout
@@ -325,10 +327,14 @@ In `report.tsx`, when `selection` is set:
 
 - `lg` and up: `grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(420px,45%)]`; the pane column is
   `lg:sticky lg:top-4 lg:h-[calc(100vh-7rem)]` so it stays put while the table scrolls.
-- below `lg`: the pane renders `fixed inset-0 z-50 p-3 bg-background/95` with the same shell inside.
+- below `lg`: the pane renders `fixed inset-0 z-50 p-3 bg-background/95` with the same shell inside, through a
+  portal on `document.body`. The sidebar rail is a `z-30` sticky element in the root stacking context, which the
+  report's own stacking context cannot climb above; a `matchMedia('(min-width: 1024px)')` hook picks docked or
+  overlay.
 
 When `selection` is `null` the report is single-column. Opening the pane does not change the table's scroll
-position.
+position. While the pane is open the Transactions table runs in `compact` mode and hides its Note column, so
+Status, Date, Amount, Merchant and Evidence fit beside the pane at 1440px.
 
 ## Theming and visual rules
 

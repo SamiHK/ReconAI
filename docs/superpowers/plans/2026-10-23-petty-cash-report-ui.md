@@ -1859,3 +1859,16 @@ This task is run by the controlling session with the built-in browser, not by an
 - [ ] **Step 5: Dark mode and Run.** Toggle the theme: tables, chips, pane and tiles follow; page images stay white with their ring. Click "Run petty-cash reconciliation": the note line appears and the tiles re-render from the fresh `report.json`.
 
 - [ ] **Step 6: Record** anything off as findings for one fix dispatch, then screenshots for the user.
+
+---
+
+### Post-review amendments (applied in the fix wave after Task 9; the code is the reference)
+
+- `LedgerLines` scrolls the highlighted line to the centre of the nearest `[data-scroll-container]` (the pane body)
+  instead of `scrollIntoView`, which also scrolled the document; highlighted rows carry `aria-current`.
+- `report.tsx` picks docked vs overlay with a `matchMedia('(min-width: 1024px)')` hook (`useSyncExternalStore`) and
+  renders the overlay through `createPortal(…, document.body)` so it sits above the sidebar rail.
+- `TransactionsTable` gains `compact?: boolean` (hides the Note column); `report.tsx` passes `compact={Boolean(sources)}`.
+- Review minors folded in: `Object.hasOwn` in `statusMeta` (with a test), same-tab click guard and `defaultPrevented`
+  guard in the pane, Jump disabled with no boxes, `rafRef` reset after cancel, lazy crop images, `aria-hidden` sort
+  glyphs, selection cleared when a re-run drops its ref, runner comment updated.

@@ -1,6 +1,6 @@
 import { describe, test, expect } from 'bun:test';
 import {
-  boxStyle, countByStatus, filterReceipts, filterRows, imageUrl, money, paneSources, pct, rowByRef, sortRows, statusMeta,
+  boxStyle, countByStatus, filterReceipts, filterRows, imageUrl, money, paneSources, pct, RECEIPT_FILTERS, rowByRef, sortRows, statusMeta,
   type Box, type PettyReport, type ReceiptGroup, type StatementRow,
 } from '../petty-cash-report';
 
@@ -59,6 +59,10 @@ describe('statusMeta', () => {
     expect(statusMeta('OTHER_MONTH')).toEqual({ word: 'Another month', glyph: '!', tone: 'warn' });
     expect(statusMeta('ROLLUP')).toEqual({ word: 'Roll-up of card spend', glyph: '·', tone: 'muted' });
     expect(statusMeta('NO_CARD_TXN')).toEqual({ word: 'No card transaction', glyph: '!', tone: 'warn' });
+    expect(statusMeta('DUPLICATE')).toEqual({ word: 'Duplicate copy', glyph: '=', tone: 'muted' });
+  });
+  test('duplicate copies get their own receipt filter', () => {
+    expect(RECEIPT_FILTERS.map(f => f.key)).toContain('DUPLICATE');
   });
   test('falls back to the raw status, and an em dash for null', () => {
     expect(statusMeta('WEIRD')).toEqual({ word: 'WEIRD', glyph: '·', tone: 'muted' });

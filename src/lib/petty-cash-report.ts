@@ -99,6 +99,7 @@ const STATUS: Record<string, { word: string; glyph: string; tone: Tone }> = {
   OTHER_MONTH: { word: 'Another month', glyph: '!', tone: 'warn' },
   ROLLUP: { word: 'Roll-up of card spend', glyph: '·', tone: 'muted' },
   NO_CARD_TXN: { word: 'No card transaction', glyph: '!', tone: 'warn' },
+  DUPLICATE: { word: 'Duplicate copy', glyph: '=', tone: 'muted' },
 };
 export function statusMeta(status: string | null): { word: string; glyph: string; tone: Tone } {
   return (status && Object.hasOwn(STATUS, status) && STATUS[status]) || { word: status ?? '—', glyph: '·', tone: 'muted' };
@@ -120,6 +121,7 @@ export const RECEIPT_FILTERS = [
   { key: 'REVIEW', label: 'Needs a decision' },
   { key: 'ORPHAN', label: 'No card row' },
   { key: 'OTHER_MONTH', label: 'Another month' },
+  { key: 'DUPLICATE', label: 'Duplicate copy' },
 ];
 
 /** Counts per status plus ALL; computed over the unfiltered list so chip counts never shrink. */

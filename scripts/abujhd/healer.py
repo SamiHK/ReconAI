@@ -1,6 +1,6 @@
 # scripts/abujhd/healer.py
 """Pluggable healer: shows one broken group (crop + its segments) to a vision model and gets corrected text per segment id plus structured fields."""
-import base64, hashlib, json, sys, pathlib
+import base64, hashlib, json, sys, pathlib, time
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import requests
 import common
@@ -64,11 +64,15 @@ def _openai(prompt, crop_png):
             {"type": "input_text", "text": prompt}]}],
         "text": {"format": {"type": "json_schema", "name": "healed_group", "schema": SCHEMA, "strict": True}},
     }
-    try:
-        r = requests.post("https://api.openai.com/v1/responses", json=body, timeout=180,
-                          headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
-    except requests.RequestException as e:
-        raise RuntimeError(f"openai request failed: {e}") from e
+    for attempt in range(3):   # connection drops are common on long runs; a failed call is never cached, so retry here
+        try:
+            r = requests.post("https://api.openai.com/v1/responses", json=body, timeout=180,
+                              headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+            break
+        except requests.RequestException as e:
+            if attempt == 2:
+                raise RuntimeError(f"openai request failed: {e}") from e
+            time.sleep(2 * (attempt + 1))
     if r.status_code != 200:
         raise RuntimeError(f"openai {r.status_code}: {r.text[:300]}")
     out = r.json()

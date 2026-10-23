@@ -43,9 +43,9 @@ Coordinates stay in the matcher's 0-1000 page space, `[x0, y0, x1, y1]`.
   },
   "kpis": {
     "card_spend": 17439.1, "purchase_count": 104, "atm_count": 19,
-    "purchases_amount": 16139.1, "evidenced_amount": 13400.0,
+    "purchases_amount": 16139.1, "evidenced_amount": 12779.46,
     "rollup": 19420.8, "open_gap": 1981.7,
-    "missing_count": 9, "missing_amount": 1234.5
+    "missing_count": 9, "missing_amount": 599.83
   },
   "counts": { "rows": { "MATCHED": 76, "REVIEW": 14 }, "receipts": { "LINKED": 79, "ORPHAN": 67, "REVIEW": 26 } },
   "rows": [ { "ref": "627308192032", "date": "2026-09-30", "time": "08:19:20", "amount": 290.0,

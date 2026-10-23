@@ -75,8 +75,8 @@ Coordinates stay in the matcher's 0-1000 page space, `[x0, y0, x1, y1]`.
 Field rules:
 
 - `rows` keep every field the UI shows; `balance`, `type`, `txn_code`, `load_type`, `y`, top-level `crop`/`box` are
-  dropped (the statement citation carries crop and box). `citations.statement` is always present; `receipts` may be
-  empty; `ledger` may be `null`. The `file` key inside citations is dropped: `meta.files` names the sources.
+  dropped (the statement citation carries crop and box, both `null` for a row the matcher could not position; the
+  pane skips such boxes). `citations.statement` is always present; `receipts` may be empty; `ledger` may be `null`. The `file` key inside citations is dropped: `meta.files` names the sources.
 - `receipts` drop `text`, `segment_ids`, `ids`, `boxes`, `broken`, `linkable`, `candidates`, `approval_code`,
   `invoice_no`, `dates`, `merchant_candidates`. `merchant`, `date`, `total` come from the healer `fields` with the
   first merchant candidate and first date as fallbacks. `amounts` is the sorted, de-duplicated list of amount values,

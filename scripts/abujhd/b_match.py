@@ -1,6 +1,7 @@
 # scripts/abujhd/b_match.py
 """Step B: key relation + gap analysis. Pure functions over Step A's JSON. No network."""
 import argparse, re, sys, pathlib, unicodedata
+from datetime import date, timedelta
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import common
 from common import load_json, save_json, _days, total_flags
@@ -76,7 +77,8 @@ def collapse_fragments(records):
     out = []
     for i, B in sorted(enumerate(records), key=lambda p: not real_merchant_tokens(p[1])):
         tb = real_merchant_tokens(B)
-        ok = [A for A in out if abs(A["page"] - B["page"]) <= 1 and receipt_amounts(A) & receipt_amounts(B) and (not A["_rm"] or not tb or A["_rm"] & tb)]
+        same_day_ok = lambda A: not _dates(A) or not _dates(B) or set(_dates(A)) & set(_dates(B))   # two days = two purchases, never one record
+        ok = [A for A in out if abs(A["page"] - B["page"]) <= 1 and receipt_amounts(A) & receipt_amounts(B) and (not A["_rm"] or not tb or A["_rm"] & tb) and same_day_ok(A)]
         if not tb and len({frozenset(A["_rm"]) for A in ok if A["_rm"]}) > 1: ok = []
         if not ok:
             out.append({**B, "ids": list(B["ids"]), "boxes": list(B["boxes"]), "amounts": [dict(x) for x in B["amounts"]], "dates": list(B["dates"]), "pages": list(B["pages"]), "_rm": set(tb), "_i": i})
@@ -94,6 +96,18 @@ def collapse_fragments(records):
     out.sort(key=lambda A: A["_i"])
     return [{k: v for k, v in A.items() if k not in ("_rm", "_i")} for A in out]
 
+def _date_readings(d, year):
+    """ISO dates a scanned date could really mean: as read, the year corrected, day and month swapped, the Arabic digits
+    3/9 confused in the month. What OCR gets wrong on these receipts, so the matcher and the other-month check agree."""
+    try: yy, mm, dd = (int(x) for x in d.split("-"))
+    except (ValueError, AttributeError): return []
+    swap = {3: 9, 9: 3}
+    out = []
+    for y_, m_, d_ in ((yy, mm, dd), (year, mm, dd), (yy, dd, mm), (year, dd, mm), (yy, swap.get(mm, mm), dd), (year, swap.get(mm, mm), dd)):
+        try: out.append(date(y_, m_, d_).isoformat())
+        except ValueError: pass
+    return list(dict.fromkeys(out))
+
 def _amount_diff(g, row):
     return min((round(abs(a - row["amount"]), 2) for a in receipt_amounts(g)), default=99)
 
@@ -102,7 +116,8 @@ def score(g, row):
     diff = _amount_diff(g, row)
     if diff > 0.05: return 0
     s = 3 if diff == 0 else 2
-    ds = [_days(d, row["date"]) for d in _dates(g)]
+    ry = int(row["date"][:4])
+    ds = [_days(x, row["date"]) for d in _dates(g) for x in _date_readings(d, ry)]
     support = 2 if 0 in ds else 1 if 1 in ds else 0
     A = norm_merchant(" ".join(_merchants(g)))
     B = norm_merchant(row["merchant"])
@@ -176,17 +191,11 @@ def split_other_month(groups, month, rows=()):
     y, m = (int(x) for x in month.split("-"))
     start = date(y, m, 1) - timedelta(days=1)
     end = date(y + (m == 12), m % 12 + 1, 1)
-    def inside(yy, mm, dd):
-        try: return start <= date(yy, mm, dd) <= end
-        except ValueError: return False
     def verdict(d):
-        try: yy, mm, dd = (int(x) for x in d.split("-"))
-        except (ValueError, AttributeError): return None
-        swap = {3: 9, 9: 3}
-        readings = [(yy, mm, dd), (y, mm, dd), (yy, dd, mm), (y, dd, mm), (yy, swap.get(mm, mm), dd), (y, swap.get(mm, mm), dd)]
-        if any(inside(*r) for r in readings): return "in"
-        try: return "other" if abs((date(yy, mm, dd) - start).days) <= 366 else None
-        except ValueError: return None
+        readings = _date_readings(d, y)
+        if not readings: return None
+        if any(start <= date.fromisoformat(x) <= end for x in readings): return "in"
+        return "other" if abs((date.fromisoformat(readings[0]) - start).days) <= 366 else None
     amounts_this_month = {round(r["amount"], 2) for r in rows if r.get("kind", "purchase") == "purchase"}
     keep, other = [], []
     for g in groups:
@@ -225,15 +234,17 @@ def second_pass(groups, rows, links, review, tol=3.0):
         return bool(A & B or _prefixes(A) & _prefixes(B) or (g.get("confidence") or 0) >= 0.7)
     all_rows = [r for r in rows if r["kind"] == "purchase"]
     for g in left:   # unique both ways against EVERY same-day row/group, not only leftovers: a taken near-twin means ambiguity
-        c = [r for r in left_rows if near(g, r)]
+        c = [r for r in left_rows if close(g, r) and _amount_diff(g, r) <= 0.10 * r["amount"]]
         if len(c) == 1 and sum(close(g, r) for r in all_rows) == 1 and sum(close(h, c[0]) for h in groups) == 1:
-            links[g["id"]] = c[0]["ref"]; left_rows.remove(c[0])
-    left = [g for g in left if not links.get(g["id"])]
+            if near(g, c[0]): links[g["id"]] = c[0]["ref"]
+            else: review[g["id"]] = [(c[0]["ref"], 0)]   # unique but unsupported: a human decides, never a silent miss
+            left_rows.remove(c[0])
+    left = [g for g in left if not links.get(g["id"]) and g["id"] not in review]
     for g in left:
         f = g.get("fields") or {}
         has_total = any(a["total_candidate"] for a in g["amounts"]) or any(isinstance(f.get(k), (int, float)) for k in ("total", "card_slip_amount"))
         if has_total or not (f.get("merchant") and f.get("date")): continue   # "no total was read", not "no amount at all": stray amounts must not block the suggestion
-        toks = real(f["merchant"])
+        toks = real(" ".join(_merchants(g)))   # healer merchant plus derived candidates, like score() does
         c = [r for r in left_rows if r["date"] == f["date"] and (toks & real(r["merchant"]) or _prefixes(toks) & _prefixes(real(r["merchant"])))]
         if len(c) == 1: review[g["id"]] = [(c[0]["ref"], 0)]; left_rows.remove(c[0])
     return links, review

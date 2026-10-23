@@ -336,6 +336,40 @@ def test_other_month_receipts_get_their_own_status():
     assert a["ref"] is None and "2026-08-14" in a["reason"] and "September 2026" in a["reason"], a["reason"]
     assert rows2[0]["status"] == "MATCHED"                                # the August receipt never competed for the September row
 
+def test_no_total_suggestion_uses_derived_merchants_too():
+    # the healer wrote the merchant in Arabic only; the derived candidate still carries the Latin name
+    rows = [R("a", 93.0, "2026-09-08", "AL OTHAIM MARKETS COMPANY"), R("b", 6.0, "2026-09-08", "ASDAF")]
+    g = _left([G("g1", 26, [], ["2026-09-08"], "شركة أسواق عبدالله العثيم (Othaim)", fields={"merchant": "شركة أسواق عبدالله العثيم", "date": "2026-09-08", "total": None, "card_slip_amount": None})])[0]
+    assert second_pass([g], rows, {"g1": None}, {})[1]["g1"] == [("a", 0)]
+
+def test_guarded_near_amount_becomes_a_suggestion():
+    # unique both ways on the day, but no merchant overlap and low healer confidence: suggest, never link
+    rows = [R("a", 30.98, "2026-09-08", "AL OTHAIM MARKETS COMPANY"), R("b", 500.0, "2026-09-08", "X")]
+    g = _left([G("g1", 34, [30.2], ["2026-09-08"], "Al-Dawaa Pharmacies", fields={"merchant": "Al-Dawaa Pharmacies", "date": "2026-09-08", "total": 30.2, "card_slip_amount": None})])[0]
+    g["confidence"] = 0.62
+    links, review = second_pass([g], rows, {"g1": None}, {})
+    assert links["g1"] is None and review["g1"] == [("a", 0)], (links, review)
+    rows2, rc = assign_statuses(rows, [g], links, review, tie_out_ledger(rows, []), [])
+    assert {r["ref"]: r["status"] for r in rows2}["a"] == "REVIEW" and rc[0]["status"] == "REVIEW"
+
+def test_score_date_support_survives_ocr_year_and_month_errors():
+    row = R("r1", 40.25, "2026-09-03", "SHATI ALTAWFIR COMPANY")
+    assert score(G("y", 1, [40.25], ["2025-09-03"], "zzz"), row) == 3 + 2      # year off by one: same day
+    assert score(G("w", 1, [40.25], ["2026-03-09"], "zzz"), row) == 3 + 2      # day/month swapped
+    assert score(G("q", 1, [40.25], ["2026-03-03"], "zzz"), row) == 3 + 2      # Arabic 3 read for 9 in the month
+    assert score(G("n", 1, [40.25], ["2026-09-20"], "zzz"), row) == 3          # a different day stays unsupported
+
+def test_collapse_fragments_keeps_different_days_apart():
+    # same shop, same total, adjacent pages, different days: two purchases, never one record
+    a = G("g1", 5, [11.5], ["2026-09-02"], "شركة ساطي الوفير التجارية", fields={"merchant": "شركة ساطي الوفير التجارية", "date": "2026-09-02", "total": 11.5, "card_slip_amount": None})
+    b = G("g2", 6, [11.5], ["2026-09-03"], "فاتورة ضريبية مبسطة", fields={"merchant": None, "date": "2026-09-03", "total": 11.5, "card_slip_amount": None})
+    for g in (a, b): g["ids"] = [g["id"]]; g["boxes"] = [(g["page"], None)]
+    assert [o["ids"] for o in collapse_fragments([a, b])] == [["g1"], ["g2"]]
+    # a merchant-less piece with no date of its own still folds into its invoice
+    c = G("g3", 6, [11.5], [], "Total Invoice", fields=None)
+    c["ids"] = ["g3"]; c["boxes"] = [(6, None)]
+    assert [o["ids"] for o in collapse_fragments([a, c])] == [["g1", "g3"]]
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

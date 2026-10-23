@@ -111,7 +111,7 @@ export function WorkspaceManager({ selectedKB, onSelect }: {
         </Button>
       )}
 
-      <Button variant="secondary" onClick={() => setCreateOpen(true)}>
+      <Button onClick={() => setCreateOpen(true)}>
         New Workspace
       </Button>
 

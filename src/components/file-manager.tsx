@@ -473,7 +473,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
               className="w-56 pl-8"
             />
           </div>
-          <Button variant="secondary" disabled={uploading} onClick={openUploadDialog}>
+          <Button disabled={uploading} onClick={openUploadDialog}>
             Upload File
           </Button>
         </div>
@@ -523,7 +523,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
           </div>
           <h3 className="text-h3">No files yet</h3>
           <p className="mt-1 text-sm text-secondary">Upload a PDF or image to start reconciling.</p>
-          <Button variant="secondary" className="mt-4" onClick={openUploadDialog}>
+          <Button className="mt-4" onClick={openUploadDialog}>
             Upload File
           </Button>
         </div>

@@ -39,7 +39,7 @@ data/abujhd/      git-ignored
   crops/          <group-id>.png, the union box of a group, cut from its page render
   cache/          healer responses keyed by sha256(crop + segments)
   overrides.json  human corrections (groups) and link overrides, honoured by A and B
-  segments.refined.json groups.json statement.json ledger.json matches.json eda.md report.html
+  segments.refined.json groups.json statement.json ledger.json matches.json eda.md report.json
 ```
 
 Every script takes `--data data/abujhd` (default), is idempotent and re-runnable, and

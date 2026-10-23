@@ -99,7 +99,10 @@ list. It runs as a plain script like `test_match.py` (`ok <name>` per test).
 
 `src/lib/petty-cash.ts` `isAllowedReportPath` allows `report.json` as the single-segment path and no longer allows
 `report.html`. `pages/<name>.png` and `crops/<name>.png` stay. The route sets `Content-Type: application/json` for
-`.json`; everything else stays `image/png`. Session gate, folder lookup and `no-store` are unchanged.
+`.json`; everything else stays `image/png`. Session gate and folder lookup are unchanged. `report.json` stays
+`Cache-Control: no-store` (a Run rewrites it); page and crop PNGs are written only by `a_refine.py`, which the Run
+button never executes, so they are served `private, max-age=3600` and the pane does not re-download 87 pages per
+click. Every response carries `X-Content-Type-Options: nosniff`.
 `POST /api/petty-cash/[kbId]/run` is unchanged: it still runs `b_match.py` then `c_report.py`.
 
 ## Report surface
@@ -299,10 +302,11 @@ Props:
   `{ left: x0/10 %, top: y0/10 %, width: (x1-x0)/10 %, height: (y1-y0)/10 % }`. The primary box is
   `ring-2 ring-primary bg-primary/10 rounded-sm`; secondary boxes are `ring-1 ring-primary/50 bg-primary/5`. Each
   carries `title={label}`. Boxes are `pointer-events-none`; the page is not interactive beyond scrolling.
-- On mount, when `activeIndex`/`jumpSignal` changes, and when the cited page's image loads, the stack scrolls so
-  the primary box centre sits at the scroller's vertical and horizontal centre
-  (`scrollTo({top, left, behavior: reduced-motion ? 'auto' : 'smooth'})`); offsets come from the page div's
-  `offsetTop`/`offsetHeight` so they are correct at every zoom.
+- On mount, when `activeIndex` changes, and when the cited page's image loads, the stack jumps instantly
+  (`behavior: 'auto'`) so the primary box centre sits at the scroller's vertical and horizontal centre; only the
+  Jump button and zoom steps scroll smoothly (and never under `prefers-reduced-motion`). An animated first scroll
+  from page 1 would drag every lazy page image on the way into the load margin, tens of 1.7 MB fetches per click.
+  Offsets come from the page div's `offsetTop`/`offsetHeight` so they are correct at every zoom.
 - `onPageInView` reports the page whose div crosses the scroller's vertical midpoint, computed in a passive
   `scroll` handler throttled by `requestAnimationFrame`.
 - A failed image shows a muted placeholder "Page image missing" in the reserved box.
@@ -325,12 +329,15 @@ of view. Above it one line: `{cell} · {code} · {money(amount)} · {relation}` 
 
 In `report.tsx`, when `selection` is set:
 
-- `lg` and up: `grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(420px,45%)]`; the pane column is
-  `lg:sticky lg:top-4 lg:h-[calc(100vh-7rem)]` so it stays put while the table scrolls.
+- `lg` and up: the header, tiles and tab pills span the full width; the two-column
+  `grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(420px,45%)]` starts at the table block, so the pane's top lines up
+  with the table. The pane column is `lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]`: once the page has scrolled it
+  fills the viewport with a 1rem margin top and bottom.
 - below `lg`: the pane renders `fixed inset-0 z-50 p-3 bg-background/95` with the same shell inside, through a
   portal on `document.body`. The sidebar rail is a `z-30` sticky element in the root stacking context, which the
   report's own stacking context cannot climb above; a `matchMedia('(min-width: 1024px)')` hook picks docked or
-  overlay.
+  overlay. The overlay is a dialog: `role="dialog" aria-modal="true" aria-label="Evidence"`, focus moves to the
+  pane's close button when it opens, and the document's scroll is locked (`body overflow: hidden`) while it is up.
 
 When `selection` is `null` the report is single-column. Opening the pane does not change the table's scroll
 position. While the pane is open the Transactions table runs in `compact` mode and hides its Note column, so

@@ -271,6 +271,19 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
     }
   };
 
+  const [pettyCashUrl, setPettyCashUrl] = useState<string | null>(null);
+  const [showPettyCash, setShowPettyCash] = useState(false);
+
+  // One probe per workspace: a 200 means the scripts' report exists for this kbId.
+  useEffect(() => {
+    const url = `/api/petty-cash/${kbId}/report.html`;
+    let cancelled = false;   // no reset needed: the runner is remounted per workspace (key={kbId})
+    fetch(url, { method: 'HEAD' })
+      .then(r => { if (!cancelled && r.ok) setPettyCashUrl(url); })
+      .catch(() => { /* no pill */ });
+    return () => { cancelled = true; };
+  }, [kbId]);
+
   // Auto-run when a reconcile request arrives from the Files tab.
   // kbId never changes within a mount (runner is remounted per workspace
   // via key={kbId}), so it's safe as a dependency.
@@ -282,7 +295,27 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
 
   return (
     <div>
-      <h2 className="text-h3 mb-4">Report</h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-h3">Report</h2>
+        {pettyCashUrl && (
+          <button
+            type="button"
+            onClick={() => setShowPettyCash(v => !v)}
+            className="rounded-full border border-border px-3 py-1 text-xs text-secondary hover:text-foreground"
+          >
+            {showPettyCash ? 'Back to reconciliation' : 'Petty-cash report'}
+          </button>
+        )}
+      </div>
+      {showPettyCash && pettyCashUrl ? (
+        <iframe
+          src={pettyCashUrl}
+          title="Petty-cash report"
+          className="w-full rounded-xl border border-border bg-white"
+          style={{ height: 'calc(100vh - 160px)' }}
+        />
+      ) : (
+        <>
 
       {/* Live reconcile pipeline (streamed during reconciliation) */}
       {(running || planTasks) && (
@@ -328,6 +361,8 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
             </p>
           </Card>
         )
+      )}
+        </>
       )}
     </div>
   );

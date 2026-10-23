@@ -2,7 +2,7 @@
 """Regression gate: compare matches.json with a human reconciliation workbook (sheet 'Card statement Sep', columns
 Date dd/mm, Time hh:mm, SAR, Matched Yes/blank). Exits 1 when agreement drops below --min-agree or wrong verdicts (we say missing where the workbook found a receipt,
 or we match where it found none) exceed --max-wrong. Undecided (REVIEW) rows are neither.
-    python3 scripts/abujhd/check_vs_workbook.py --data data/abujhd --workbook <path.xlsx> [--min-agree 82 --max-wrong 5]"""
+    python3 scripts/abujhd/check_vs_workbook.py --data data/abujhd --workbook <path.xlsx> [--min-agree 85 --max-wrong 5]"""
 import argparse, collections, json, sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import common

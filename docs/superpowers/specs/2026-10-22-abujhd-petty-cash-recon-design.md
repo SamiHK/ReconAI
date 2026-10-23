@@ -189,7 +189,7 @@ total-family keywords), so pass 1 is affected by the ranker too; the September g
 ## Regression gate
 
 ```
-python scripts/abujhd/check_vs_workbook.py --data data/abujhd --workbook <xlsx> --min-agree 82 --max-wrong 5
+python scripts/abujhd/check_vs_workbook.py --data data/abujhd --workbook <xlsx> --min-agree 85 --max-wrong 5
 ```
 
 Compares `matches.json` with the human reconciliation workbook (sheet "Card statement Sep"), purchase rows only.

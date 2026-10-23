@@ -100,7 +100,18 @@ def collapse_fragments(records):
     Each record tracks `_rm`, the real merchant tokens of everything merged into it, so two different shops never share a record (p10: same 10.00),
     `_inv`, the invoice numbers seen, and `_tl`, whether a piece printed its own total line: two numbers or two total lines are two documents
     (p23/p24: invoices 1634 and 1635, both 10.01; p82/p83: two copies of one receipt), never fragments of one.
-    Merchant-less pieces go last (order-independent) and stay unmerged when two different shops would both accept them."""
+    Merchant-less pieces go last (order-independent) and stay unmerged when two different shops would both accept them.
+    Last, a page with one priced, undated document: its unpriced dated piece (an online invoice's date block, p87-g3) dates that document."""
+    def fold(A, B, tb):
+        A["ids"] += B["ids"]; A["boxes"] += B["boxes"]; A["_rm"] |= tb; A["_inv"] |= {(B.get("fields") or {}).get("invoice_no")} - {None}; A["_tl"] = A["_tl"] or _own_total_line(B)
+        A["notes"] = " ".join(filter(None, [A.get("notes"), B.get("notes")])) or None   # a multi-document note on any piece must survive
+        for x in B["amounts"]:
+            m = next((y for y in A["amounts"] if y["value"] == x["value"]), None)
+            if m: m["total_candidate"] = m["total_candidate"] or x["total_candidate"]
+            else: A["amounts"].append(dict(x))
+        A["dates"] += [d for d in B["dates"] if d not in A["dates"]]
+        if not (A.get("fields") or {}).get("merchant") and (B.get("fields") or {}).get("merchant"): A["fields"] = B["fields"]
+        A["pages"] = sorted(set(A["pages"]) | set(B["pages"]))
     out = []
     for i, B in sorted(enumerate(records), key=lambda p: not real_merchant_tokens(p[1])):
         tb = real_merchant_tokens(B); ib = (B.get("fields") or {}).get("invoice_no"); lb = _own_total_line(B)
@@ -112,16 +123,11 @@ def collapse_fragments(records):
             out.append({**B, "ids": list(B["ids"]), "boxes": list(B["boxes"]), "amounts": [dict(x) for x in B["amounts"]], "dates": list(B["dates"]), "pages": list(B["pages"]),
                         "_rm": set(tb), "_i": i, "_inv": {ib} - {None}, "_tl": lb})
             continue
-        A = ok[0]
-        A["ids"] += B["ids"]; A["boxes"] += B["boxes"]; A["_rm"] |= tb; A["_inv"] |= {ib} - {None}; A["_tl"] = A["_tl"] or lb
-        A["notes"] = " ".join(filter(None, [A.get("notes"), B.get("notes")])) or None   # a multi-document note on any piece must survive
-        for x in B["amounts"]:
-            m = next((y for y in A["amounts"] if y["value"] == x["value"]), None)
-            if m: m["total_candidate"] = m["total_candidate"] or x["total_candidate"]
-            else: A["amounts"].append(dict(x))
-        A["dates"] += [d for d in B["dates"] if d not in A["dates"]]
-        if not (A.get("fields") or {}).get("merchant") and (B.get("fields") or {}).get("merchant"): A["fields"] = B["fields"]
-        A["pages"] = sorted(set(A["pages"]) | set(B["pages"]))
+        fold(ok[0], B, tb)
+    for B in [B for B in out if not receipt_amounts(B) and _dates(B)]:
+        priced = [A for A in out if A["page"] == B["page"] and receipt_amounts(A)]
+        if len(priced) == 1 and not _dates(priced[0]):
+            fold(priced[0], B, set()); out.remove(B)
     out.sort(key=lambda A: A["_i"])
     return [{k: v for k, v in A.items() if k not in ("_rm", "_i", "_inv", "_tl")} for A in out]
 

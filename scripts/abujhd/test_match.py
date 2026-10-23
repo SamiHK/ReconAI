@@ -562,6 +562,26 @@ def test_cash_receipt_dated_after_the_card_charge_is_a_suggestion_not_a_match():
     card = {**g, "notes": "Single invoice with an attached mada slip.", "text": "فاتورة ضريبية\nالتاريخ 2026/09/21\nمدى\nالإجمالي 16.00"}
     assert match_receipts([card], [row], {})[0]["g"] == "r"
 
+def test_unpriced_dated_piece_of_a_single_receipt_page_dates_its_record():
+    # p87: an online invoice printed as blocks; only the totals block (p87-g1 with g2/g5) has an amount, the date sits alone on p87-g3
+    tot = G("tot", 87, [194.01], [], "مركز المعرفة العلمية للتدريب", kind="other", fields={"merchant": "مركز المعرفة العلمية للتدريب", "date": None, "total": 194.01})
+    day = G("day", 87, [], ["2026-09-23"], "تاريخ الطلب: Wednesday 23 September", kind="other", fields={"merchant": None, "date": "2026-09-23", "time": "01:25 PM", "total": None})
+    cust = G("cust", 87, [], [], "MAKEEN INDUSTRIAL COMPANY", kind="other", fields={"merchant": "MAKEEN INDUSTRIAL COMPANY", "date": None, "total": None})
+    for g in (tot, day, cust): g["ids"] = [g["id"]]; g["boxes"] = [(87, None)]
+    out = collapse_fragments([day, cust, tot])                    # order-independent: the date block comes first here
+    rec = next(o for o in out if "tot" in o["ids"])
+    assert sorted(rec["ids"]) == ["day", "tot"] and "2026-09-23" in rec["dates"] and rec["fields"]["merchant"] == "مركز المعرفة العلمية للتدريب", out
+    row = R("r", 194.01, "2026-09-23", "Knowledge tc SAU", time="13:25:22")
+    assert match_receipts(out, [row], {})[0][rec["id"]] == "r"
+    # a page whose priced record already has a date keeps another receipt's header apart (p26: an Othaim header beside an Asdaf slip)
+    asdaf = G("asdaf", 26, [6.0], ["2026-09-08"], "ASDAF ALMUHIT", fields={"merchant": "ASDAF ALMUHIT", "date": "2026-09-08", "total": 6.0})
+    oth = G("oth", 26, [], ["2026-09-08"], "Othaim", fields={"merchant": "Othaim", "date": "2026-09-08", "total": None})
+    for g in (asdaf, oth): g["ids"] = [g["id"]]; g["boxes"] = [(26, None)]
+    assert [o["ids"] for o in collapse_fragments([oth, asdaf])] == [["oth"], ["asdaf"]]
+    # two priced records on the page: nobody can tell whose date it is
+    two = G("two", 87, [50.0], [], "Other Shop", fields={"merchant": "Other Shop", "date": None, "total": 50.0}); two["ids"] = ["two"]; two["boxes"] = [(87, None)]
+    assert len(collapse_fragments([day, tot, two])) == 3
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

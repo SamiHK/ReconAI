@@ -1,4 +1,4 @@
-// Serves the petty-cash scripts' report.html and its images for the workspace whose data/<client>/config.json
+// Serves the petty-cash scripts' report.json and its page/crop images for the workspace whose data/<client>/config.json
 // carries that kb_id. Read-only, allowlisted paths, same session gate as the DocAI proxy.
 import { NextRequest, NextResponse } from 'next/server';
 import { existsSync, readFileSync } from 'node:fs';
@@ -27,12 +27,11 @@ export async function GET(
   const file = folder && join(folder, ...path);
   if (!file || !existsSync(file)) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
-  const html = path[path.length - 1].endsWith('.html');
+  const json = path[path.length - 1].endsWith('.json');
   return new Response(readFileSync(file), {
     headers: {
-      'Content-Type': html ? 'text/html; charset=utf-8' : 'image/png',
+      'Content-Type': json ? 'application/json; charset=utf-8' : 'image/png',
       'Cache-Control': 'no-store',
-      'Content-Security-Policy': "default-src 'none'; img-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com",
     },
   });
 }

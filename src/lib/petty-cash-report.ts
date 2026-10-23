@@ -3,9 +3,11 @@
 
 export type Box = [number, number, number, number]; // x0, y0, x1, y1 in the matcher's 0-1000 page space
 
-export interface StatementCitation { page: number; box: Box; crop: string }
+// A statement row the matcher could not position on the page carries a null box and crop (a_refine.py sets both
+// to None when the row has no y); the pane skips such boxes. Receipt citations always have a box.
+export interface StatementCitation { page: number; box: Box | null; crop: string | null }
 export interface ReceiptCitation { page: number; group_id: string; box: Box; crop: string }
-export interface LedgerCitation { sheet: string; row: number; cell: string; code: string; date: string; amount: number; relation: string }
+export interface LedgerCitation { sheet: string; row: number; cell: string; code: string; date: string; amount: number | null; relation: string }
 
 export interface StatementRow {
   ref: string;

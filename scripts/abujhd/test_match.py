@@ -1,7 +1,7 @@
 # scripts/abujhd/test_match.py
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from b_match import norm_merchant, receipt_amounts, collapse_card_slips, score, match_receipts
+from b_match import norm_merchant, receipt_amounts, collapse_card_slips, collapse_fragments, score, match_receipts
 
 def G(id, page, amounts, dates, merchant, kind="receipt", fields=None, notes=None):
     return {"id": id, "page": page, "pages": [page], "amounts": [{"value": a, "total_candidate": True} for a in amounts],
@@ -407,6 +407,28 @@ def test_sequential_invoices_pair_with_payment_order():
     u1, u2 = _left([G("u1", 23, [10.01], ["2026-09-07"], "Ahmed Al Rahiman", fields=F(None)), G("u2", 24, [10.01], ["2026-09-07"], "Ahmed Al Rahiman", fields=F(None))])
     l4, r4 = match_receipts([u1, u2], rows, {}); l4, r4 = second_pass([u1, u2], rows, l4, r4)
     assert set(r4) == {"u1", "u2"} and not any(l4.values()), (l4, r4)
+
+def test_unhealed_card_slip_joins_the_receipt_it_pays_for():
+    rows = [R("091017099294", 1010.85, "2026-09-10", "ALBOSAAD TRADING COMPANY", time="10:17:41"), R("090810003459", 330.0, "2026-09-21", "NORA ALQHTANY EST", time="08:10:46")]
+    # p38: a Latin-named invoice and an unhealed Arabic-named mada slip that prints the same total and the statement's own reference number
+    inv = G("i", 38, [1010.85], ["2026-09-10"], "AL BOSAAD TARDING COMPANY", kind="invoice", fields={"merchant": "AL BOSAAD TARDING COMPANY", "date": "2026-09-10", "total": 1010.85})
+    slip = G("s", 38, [1010.85], ["2026-09-10"], "شركة البوسعد التجارية", kind=None); slip["text"] = "شركة البوسعد التجارية\n10:17:54\n1520 1 RU.01L 091017099294\nمدى mada PURCHASE\nPURCHASE AMOUNT 1010.85\nAPPROVED"
+    out = collapse_card_slips([inv, slip], rows)
+    assert len(out) == 1 and out[0]["ids"] == ["i", "s"] and out[0]["fields"]["card_slip_amount"] == 1010.85, out
+    # p65: a handwritten form with only a total, and a slip whose OCR amount is garbage (335.55) but whose reference is the 330.00 row's
+    form = G("f", 65, [330.0], [], "Customer Sig.", kind="other", fields={"merchant": None, "date": None, "total": 330})
+    slip2 = G("s2", 65, [335.55], ["2026-03-21"], "نقليات الناصر", kind=None); slip2["text"] = "نقليات الناصر\n21/03/2026 08:10:57\n1520 090810003459\nمدى\nPURCHASE AMOUNT 335.55\nAPPROVED"
+    out = collapse_card_slips([form, slip2], rows)
+    assert len(out) == 1 and out[0]["ids"] == ["f", "s2"] and "2026-03-21" in out[0]["dates"], out     # the slip dates the payment
+    links, review = match_receipts(out, rows, {})
+    assert links["f"] == "090810003459" and not review, (links, review)                                 # 330 + 21/09 (٣ read for ٩): matched, not a bare-amount review
+    # a slip on a page whose receipts have another total stays its own record, after the receipts
+    lone = G("l", 20, [10.0], ["2026-09-06"], "x", kind=None); lone["text"] = "mada PURCHASE AMOUNT 10.00 624910165282"
+    other = G("o", 20, [11.5], ["2026-09-06"], "Shop", kind="invoice", fields={"merchant": "Shop", "date": "2026-09-06", "total": 11.5})
+    assert [o["ids"] for o in collapse_card_slips([lone, other], rows + [R("624910165282", 10.0, "2026-09-06", "X")])] == [["o"], ["l"]]
+    # a healed receipt with an embedded slip section is a receipt, not a slip
+    rcpt = G("r", 30, [97.5], ["2026-09-08"], "MAZA REST", kind="receipt", fields={"merchant": "MAZA REST", "date": "2026-09-08", "total": 97.5}); rcpt["text"] = "MAZA REST\nmada PURCHASE AMOUNT 97.50 625101016891"
+    assert [o["ids"] for o in collapse_card_slips([rcpt, other], rows)] == [["r"], ["o"]]
 
 if __name__ == "__main__":
     for name, fn in list(globals().items()):

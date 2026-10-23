@@ -44,23 +44,39 @@ def _merchants(g):
     f = g.get("fields") or {}
     return ([f["merchant"]] if f.get("merchant") else []) + g["merchant_candidates"]
 
-def collapse_card_slips(groups):
-    """A card_slip group joins a same-amount receipt/invoice on the same or previous page (merchant must agree when the slip names one).
+_SLIP_TEXT = re.compile(r"\bmada\b|مدى|purchase amount|مبلغ الشراء|approval code|رمز الموافقة", re.I)
+
+def _is_slip(g):
+    """A healed group says what it is; an unhealed one is a card slip when its text reads like one (p38-g3, p65-g1)."""
+    return g.get("kind") == "card_slip" or (not g.get("fields") and bool(_SLIP_TEXT.search(g.get("text") or "")))
+
+def _slip_row_amounts(s, rows):
+    """Amounts of the purchase rows whose reference number the slip prints: a mada slip's RRN is the statement ref (p38-g3: 091017099294)."""
+    refs = set(re.findall(r"\b\d{12}\b", s.get("text") or ""))
+    return {round(r["amount"], 2) for r in rows if r["ref"] in refs and r.get("kind", "purchase") == "purchase"}
+
+def collapse_card_slips(groups, rows=()):
+    """A card slip joins a same-amount receipt/invoice on the same or previous page (merchant must agree when the slip names one),
+    or the same-page receipt whose total is the amount of the statement row the slip's printed reference names (OCR may garble
+    the slip's own amount: p65-g1 reads 335.55 for 330.00). The slip's date then dates the purchase.
     Order-independent: receipts/invoices first in input order, then any slip that found no receipt as its own record."""
     out, used = [], set()
     for g in groups:
-        if g.get("kind") == "card_slip" or g["id"] in used: continue
+        if _is_slip(g) or g["id"] in used: continue
         rec = {**g, "ids": [g["id"]], "boxes": [(g["page"], g.get("box"))]}
         for s in groups:
-            if s.get("kind") != "card_slip" or s["id"] in used or s["page"] not in (g["page"], g["page"] + 1): continue
-            if not (receipt_amounts(s) & receipt_amounts(g)): continue
-            if _merchants(s) and not (norm_merchant(" ".join(_merchants(s))) & norm_merchant(" ".join(_merchants(g)))): continue
+            if not _is_slip(s) or s["id"] in used or s["page"] not in (g["page"], g["page"] + 1): continue
+            amt = receipt_amounts(s) & receipt_amounts(g)
+            if amt and _merchants(s) and not (norm_merchant(" ".join(_merchants(s))) & norm_merchant(" ".join(_merchants(g)))): amt = set()
+            if not amt and s["page"] == g["page"]: amt = _slip_row_amounts(s, rows) & receipt_amounts(g)
+            if not amt: continue
             used.add(s["id"]); rec["ids"].append(s["id"]); rec["boxes"].append((s["page"], s.get("box")))
             rec["notes"] = " ".join(filter(None, [rec.get("notes"), s.get("notes")])) or None
-            rec["fields"] = {**(rec.get("fields") or {}), "card_slip_amount": next(iter(receipt_amounts(s) & receipt_amounts(g)))}
+            rec["fields"] = {**(rec.get("fields") or {}), "card_slip_amount": next(iter(amt))}
+            rec["dates"] = rec["dates"] + [d for d in s["dates"] if d not in rec["dates"]]
         used.add(g["id"]); out.append(rec)
     for s in groups:
-        if s.get("kind") == "card_slip" and s["id"] not in used:
+        if _is_slip(s) and s["id"] not in used:
             out.append({**s, "ids": [s["id"]], "boxes": [(s["page"], s.get("box"))]})
     return out
 
@@ -385,7 +401,7 @@ def main():
     cfg = common.config(); STATEMENT_FILE, RECEIPTS_FILE, LEDGER_FILE = (cfg["names"][k] for k in ("statement", "receipts", "ledger"))
     statement = load_json(common.DATA / "statement.json"); ledger = load_json(common.DATA / "ledger.json"); groups = load_json(common.DATA / "groups.json")
     overrides = load_json(common.DATA / "overrides.json") if (common.DATA / "overrides.json").exists() else {}
-    groups = collapse_fragments(collapse_card_slips(groups))
+    groups = collapse_fragments(collapse_card_slips(groups, statement))
     groups, other_month = split_other_month(groups, cfg["month"], statement)
     links, review = match_receipts(groups, statement, overrides)
     links, review = second_pass(groups, statement, links, review)

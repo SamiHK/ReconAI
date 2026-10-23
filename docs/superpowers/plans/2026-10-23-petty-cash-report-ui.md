@@ -1114,13 +1114,22 @@ export function ReceiptsTable({ report, kbId, selection, onSelect }: { report: P
               >
                 <TableCell><StatusChip status={g.status} /></TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-2">
+                  {/* A real button: an orphan receipt has no statement chip, so this is the keyboard route into the pane. */}
+                  <button
+                    type="button"
+                    aria-label={`Open receipt ${g.id} on page ${g.page}`}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onSelect({ kind: 'receipt', id: g.id, source: 'receipt' });
+                    }}
+                    className="flex items-center gap-2 rounded-md text-left hover:text-primary focus-visible:outline-2 focus-visible:outline-ring"
+                  >
                     {g.crop && (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={imageUrl(kbId, g.crop)} alt="" className="h-10 w-auto max-w-16 rounded border border-border bg-white object-cover object-top" />
                     )}
                     <span className="font-mono text-xs">p{g.page} · {g.id}</span>
-                  </div>
+                  </button>
                 </TableCell>
                 <TableCell className="font-mono text-xs">{g.date ?? <span className="text-muted-foreground">no date</span>}</TableCell>
                 <TableCell className="text-right font-mono text-xs tabular-nums">{amountCell(g)}</TableCell>

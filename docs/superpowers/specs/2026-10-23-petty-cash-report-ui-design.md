@@ -213,7 +213,8 @@ Table columns:
 | Merchant | `merchant` or muted "no merchant read" |
 | Statement rows | Linked: one `CitationChip` per `refs` entry showing the ref's date and amount. Needs a decision: one chip per `review` candidate `[ref, score]` showing `{date} · {money(amount)} · {merchant[:24]} · score {score}`; "its candidates were taken by other receipts" muted when the list is empty. Otherwise `reason`. |
 
-Clicking a row calls `onSelect({ kind: 'receipt', id, source: 'receipt' })`. Clicking a statement chip calls
+The Receipt cell (crop plus `p{page} · {id}`) is a real `<button>` so an orphan group, which has no statement chip,
+can be opened from the keyboard; it and a click anywhere on the row call `onSelect({ kind: 'receipt', id, source: 'receipt' })`. Clicking a statement chip calls
 `onSelect({ kind: 'row', ref, source: 'statement' })` and switches the pane to that row.
 
 ### Ledger tab

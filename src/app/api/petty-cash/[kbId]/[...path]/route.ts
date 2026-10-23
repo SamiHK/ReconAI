@@ -4,7 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolveApiKey, COOKIE_NAME } from '@/lib/session';
-import { findFolderForKb, isAllowedReportPath } from '@/lib/petty-cash';
+import { docaiFetch } from '@/lib/docai-proxy';
+import { canAccessKb, findFolderForKb, isAllowedReportPath } from '@/lib/petty-cash';
 
 const DATA_DIR = join(process.cwd(), 'data');
 
@@ -19,6 +20,9 @@ export async function GET(
   if (!/^[0-9a-fA-F-]{36}$/.test(kbId) || !isAllowedReportPath(path)) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
+  if (!(await canAccessKb(kbId, apiKey, () => docaiFetch('/v1/knowledge-bases', { docaiApiKey: apiKey })))) {
+    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  }
   const folder = findFolderForKb(DATA_DIR, kbId);
   const file = folder && join(folder, ...path);
   if (!file || !existsSync(file)) return NextResponse.json({ error: 'Not found' }, { status: 404 });
@@ -28,6 +32,7 @@ export async function GET(
     headers: {
       'Content-Type': html ? 'text/html; charset=utf-8' : 'image/png',
       'Cache-Control': 'no-store',
+      'Content-Security-Policy': "default-src 'none'; img-src 'self'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com",
     },
   });
 }

@@ -29,6 +29,8 @@ operator's responsibility (two folders for one workspace, e.g. a snapshot and a 
 4. Response: the file bytes with `Content-Type` `text/html; charset=utf-8` or `image/png`, `Cache-Control: no-store`.
    `HEAD` is answered by the same handler (Next implements it from `GET`) so the client can probe cheaply.
 
+With the `DOCAI_API_KEY` env fallback set the route runs on the server's key, which means no per-user authentication: local, single-tenant use only.
+
 Pure helpers in `src/lib/petty-cash.ts`: `findFolderForKb(dataDir, kbId) -> string | null` and
 `isAllowedReportPath(segments) -> boolean`. These are what the tests cover.
 

@@ -2,7 +2,7 @@ import { describe, test, expect, beforeAll, afterAll } from 'bun:test';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { findFolderForKb, isAllowedReportPath } from '../petty-cash';
+import { findFolderForKb, isAllowedReportPath, canAccessKb } from '../petty-cash';
 
 const KB = '1cd041cc-d3a8-4c35-bf70-ac4ad8f72c5a';
 let data: string;
@@ -47,5 +47,27 @@ describe('isAllowedReportPath', () => {
     expect(isAllowedReportPath(['pages', 'x.svg'])).toBe(false);
     expect(isAllowedReportPath(['pages', 'a%2f.png'])).toBe(false);
     expect(isAllowedReportPath([])).toBe(false);
+  });
+});
+
+describe('canAccessKb', () => {
+  const list = (body: unknown, ok = true) => async () => new Response(JSON.stringify(body), { status: ok ? 200 : 500 });
+  // the cache is keyed by kb + last 8 chars of the key, so every case gets its own key
+  test('true when the workspace list contains the id', async () => {
+    expect(await canAccessKb(KB, 'key-aaaaaaaa', list({ knowledge_bases: [{ id: 'x' }, { id: KB }] }))).toBe(true);
+  });
+  test('false when it does not', async () => {
+    expect(await canAccessKb(KB, 'key-bbbbbbbb', list({ knowledge_bases: [{ id: 'x' }] }))).toBe(false);
+  });
+  test('false on a non-ok response and on a throw', async () => {
+    expect(await canAccessKb(KB, 'key-cccccccc', list({ knowledge_bases: [{ id: KB }] }, false))).toBe(false);
+    expect(await canAccessKb(KB, 'key-dddddddd', async () => { throw new Error('down'); })).toBe(false);
+  });
+  test('a second call inside the TTL does not hit DocAI again', async () => {
+    let calls = 0;
+    const counted = async () => { calls++; return new Response(JSON.stringify({ knowledge_bases: [{ id: KB }] })); };
+    expect(await canAccessKb(KB, 'key-eeeeeeee', counted)).toBe(true);
+    expect(await canAccessKb(KB, 'key-eeeeeeee', counted)).toBe(true);
+    expect(calls).toBe(1);
   });
 });

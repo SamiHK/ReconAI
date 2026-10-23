@@ -255,6 +255,8 @@ def second_pass(groups, rows, links, review, tol=3.0):
        order = payment order (p23/p24: 1634 and 1635 paid at 13:06 and 13:10).
     1) split payment: two same-day unlinked rows (leftover or parked in a review list) with the identical statement merchant string
        summing exactly to an unlinked receipt's total -> both linked (p10-g2: 10.00 + 10.00 = 20.00).
+    1a) bundle: same-merchant rows paid within one minute whose sum is the sum of the unlinked same-day receipts (not slips) on one run of
+       consecutive pages -> every receipt of the run linked to all of them (p42-44: 115 + 34.50 + 57.50 paid as 202 + 5).
     1b) elimination: a review group whose candidate list the claims above shrank to one row of score >= 4 that nobody else lists -> linked.
     2) near amount: one row within `tol` SAR on the receipt's date, unique both ways -> linked (assign_statuses shows AMOUNT_MISMATCH);
        a taken near-twin means ambiguity unless the one leftover candidate is also the only twin that names the shop (p59: 24.15 vs 24.00 and a 25.00 of another shop).
@@ -278,6 +280,23 @@ def second_pass(groups, rows, links, review, tol=3.0):
             pairs = [(a, b) for i, a in enumerate(c) for b in c[i + 1:] if a["merchant"] == b["merchant"] and abs(_r2(a["amount"] + b["amount"]) - T) <= 0.05]
             if len(pairs) == 1:
                 claim(g["id"], [pairs[0][0]["ref"], pairs[0][1]["ref"]]); break
+    minute = {}
+    for r in rows:
+        if r["kind"] == "purchase": minute.setdefault((r["merchant"], r["date"], (r.get("time") or "")[:5]), []).append(r)
+    for rs in minute.values():
+        if len(rs) < 2 or all(r["ref"] in linked() for r in rs): continue
+        S = _r2(sum(r["amount"] for r in rs))
+        cands = sorted([g for g in groups if not links.get(g["id"]) and not review.get(g["id"]) and not _is_slip(g) and len(receipt_amounts(g)) == 1 and _same_day(g, rs[0])], key=lambda g: g["page"])
+        runs = []
+        for i in range(len(cands)):
+            run, tot = [], 0
+            for g in cands[i:]:
+                if run and g["page"] > run[-1]["page"] + 1: break
+                run.append(g); tot = _r2(tot + next(iter(receipt_amounts(g))))
+                if tot > S + 0.05: break
+                if abs(tot - S) <= 0.05 and len(run) > 1: runs.append(run); break
+        if len(runs) == 1:
+            for g in runs[0]: claim(g["id"], [r["ref"] for r in sorted(rs, key=lambda r: r.get("time") or "")])
     for gid, c in list(review.items()):
         others = {r for h, cc in review.items() if h != gid for r, _ in cc}
         if len(c) == 1 < n0[gid] and c[0][1] >= 4 and c[0][0] not in others | linked() and not _looks_multi_document(by_id[gid].get("notes")): claim(gid, c[0][0])

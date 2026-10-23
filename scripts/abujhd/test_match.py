@@ -479,6 +479,30 @@ def test_healer_dated_receipt_on_another_day_is_no_bare_amount_candidate():
     nameless = _left([G("nameless", 60, [24.15], ["2026-09-19"], "Somebody Else", fields={"merchant": "Somebody Else", "date": "2026-09-19", "total": 24.15})])[0]; nameless["confidence"] = 0.95
     assert second_pass([nameless], [row, twin], {"nameless": None, "oil": ["t", "x"]}, {})[0]["nameless"] is None   # no name support: still ambiguous
 
+def test_bundle_of_invoices_paid_in_two_same_minute_card_payments():
+    # p42-44: three STC invoices (115 + 34.50 + 57.50 = 207) paid as 202 + 5 within one minute; the healer read the 202 slip as a total
+    rows = [R("c202", 202.0, "2026-09-12", "STC Channels 73008King Abdulla", time="10:21:20"), R("c5", 5.0, "2026-09-12", "STC Channels 73008King Abdulla", time="10:21:53"),
+            R("z", 5.0, "2026-09-28", "ASDAF ALMUHIT", time="16:36:17")]
+    slip = _left([G("slip", 42, [202.0], ["2026-09-12"], "STC Channels-73008", kind="card_slip", fields={"merchant": "STC Channels-73008", "date": "2026-09-12", "total": 202.0, "card_slip_amount": 202.0})])[0]
+    F = lambda t, inv: {"merchant": None, "date": "2026-09-12", "total": t, "invoice_no": inv}
+    i1, i2, i3 = _left([G("i1", 42, [115.0], ["2026-09-12"], "نوع الهوية: سجل تجاري", kind="invoice", fields=F(115.0, "13163902689")),
+                        G("i2", 43, [34.5], ["2026-09-12"], "نوع الهوية: سجل تجاري", kind="invoice", fields=F(34.5, "13162924623")),
+                        G("i3", 44, [57.5], ["2026-09-12"], "نوع الهوية: سجل تجاري", kind="invoice", fields=F(57.5, "13163338088"))])
+    five = _left([G("five", 20, [5.0], ["2026-09-06"], "x")])[0]          # an unhealed 5.00 receipt elsewhere parks both 5.00 rows on amount alone
+    groups = [slip, i1, i2, i3, five]
+    links, review = match_receipts(groups, rows, {})
+    assert links["slip"] == "c202" and {r for r, _ in review["five"]} == {"c5", "z"}, (links, review)
+    links, review = second_pass(groups, rows, links, review)
+    assert links["i1"] == links["i2"] == links["i3"] == ["c202", "c5"] and links["slip"] == "c202", (links, review)
+    assert review == {"five": [("z", 3)]}, review                           # the STC 5.00 left the other list
+    rows2, rc = assign_statuses(rows, groups, links, review, tie_out_ledger(rows, []), [])
+    assert {r["ref"]: r["status"] for r in rows2} == {"c202": "MATCHED", "c5": "MATCHED", "z": "REVIEW"}
+    assert {g["id"]: g["status"] for g in rc} == {"slip": "LINKED", "i1": "LINKED", "i2": "LINKED", "i3": "LINKED", "five": "REVIEW"}
+    # the run must be consecutive pages: with the middle invoice on page 45 nothing sums to 207
+    i2["page"] = 45; i2["pages"] = [45]
+    links, review = match_receipts(groups, rows, {}); links, review = second_pass(groups, rows, links, review)
+    assert links["i1"] is None and links["i2"] is None and links["i3"] is None and {r for r, _ in review["five"]} == {"c5", "z"}, (links, review)
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

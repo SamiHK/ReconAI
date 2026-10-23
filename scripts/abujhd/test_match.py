@@ -212,9 +212,9 @@ def test_second_pass_split_payment():
     g = _left([G("g1", 1, [41.0], ["2026-09-01"], "Qalat")])[0]
     links, review = second_pass([g], rows, {"g1": None}, {})
     assert links["g1"] == ["a", "b"], links          # same merchant string, same day, exact sum
-    # a leftover row already named in a review list, or already linked, is never consumed
+    # a row parked in another group's review list is settled by an exact split (and leaves that list); a linked row is never consumed
     links, review = second_pass([g], rows, {"g1": None}, {"zz": [("b", 3)]})
-    assert links["g1"] is None, links
+    assert links["g1"] == ["a", "b"] and review == {"zz": []}, (links, review)
     links, review = second_pass([g], rows, {"g1": None, "g2": "a"}, {})
     assert links["g1"] is None, links
     rows4 = [R("a", 25.0, "2026-09-19", "PURE OIL"), R("b", 45.0, "2026-09-19", "PURE OIL")]
@@ -443,6 +443,21 @@ def test_split_invoice_halves_merge_despite_a_numeric_header_line():
     row = R("r", 316.0, "2026-09-24", "mwssh sbgh alalwanalauon amro"); out[0]["confidence"] = 0.98
     links, review = match_receipts(out, [row], {}); links, review = second_pass(out, [row], links, review)
     assert links["h"] == "r", (links, review)
+
+def test_split_payment_settles_review_rows_and_elimination_follows():
+    # p10: two 10.00 ASDAF payments at 08:44/08:45 and a 10.00 Durrat payment at 09:30; the ASDAF receipt totals 20.00 (slip 10.00, year misread 2025), the Durrat invoice 10.00
+    rows = [R("a44", 10.0, "2026-09-03", "ASDAF ALMUHITAl Oyoun FirsAL A", time="08:44:49"), R("a45", 10.0, "2026-09-03", "ASDAF ALMUHITAl Oyoun FirsAL A", time="08:45:23"),
+            R("d30", 10.0, "2026-09-03", "mwssh drh albndqyh llmwadalaiu", time="09:30:27")]
+    asdaf = _left([G("asdaf", 10, [20.0, 10.0], ["2025-09-03"], "ASDAF ALMUHIT", fields={"merchant": "ASDAF ALMUHIT", "date": "2025-09-03", "total": 20.0, "card_slip_amount": 10.0})])[0]
+    durrat = _left([G("durrat", 10, [10.0], ["2026-09-03"], "مؤسسة درة البندقية للمواد الغذائية", fields={"merchant": "مؤسسة درة البندقية للمواد الغذائية", "date": "2026-09-03", "total": 10.0})])[0]
+    links, review = match_receipts([asdaf, durrat], rows, {})
+    assert set(review) == {"asdaf", "durrat"} and not any(links.values()), (links, review)        # pass 1: a three-way tie
+    links, review = second_pass([asdaf, durrat], rows, links, review)
+    assert links["asdaf"] == ["a44", "a45"] and links["durrat"] == "d30" and not review, (links, review)   # split, then the last candidate standing
+    # a group the healer flagged as several documents keeps its decision even when it is the last candidate standing
+    multi = _left([G("multi", 11, [10.0], ["2026-09-03"], "مؤسسة درة البندقية للمواد الغذائية", notes="two separate receipts", fields={"merchant": "مؤسسة درة البندقية للمواد الغذائية", "date": "2026-09-03", "total": 10.0})])[0]
+    links, review = match_receipts([asdaf, multi], rows, {}); links, review = second_pass([asdaf, multi], rows, links, review)
+    assert links["asdaf"] == ["a44", "a45"] and links["multi"] is None and review == {"multi": [("d30", 5)]}, (links, review)
 
 if __name__ == "__main__":
     for name, fn in list(globals().items()):

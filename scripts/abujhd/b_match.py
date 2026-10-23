@@ -243,19 +243,26 @@ def split_other_month(groups, month, rows=()):
 
 def _refs(v): return v if isinstance(v, list) else [v] if v else []
 
+def _same_day(g, r):
+    """The row's day under some plausible reading of a receipt date: the year off (p10-g2: 2025 for 2026), day/month swapped, ٣ for ٩."""
+    return any(x == r["date"] for d in _dates(g) for x in _date_readings(d, int(r["date"][:4])))
+
 def second_pass(groups, rows, links, review, tol=3.0):
     """Pass 1's links are never touched; its ties are settled where the evidence allows, then leftovers (rows nobody linked or
     listed for review, groups with no link and no review entry) get the weaker rules.
     0) sequential invoices: k review groups of one shop tying over the same k same-day rows of that shop -> paired, invoice-number
        order = payment order (p23/p24: 1634 and 1635 paid at 13:06 and 13:10).
-    1) split payment: two same-day rows with the identical statement merchant string summing exactly to a receipt total -> both linked.
+    1) split payment: two same-day unlinked rows (leftover or parked in a review list) with the identical statement merchant string
+       summing exactly to an unlinked receipt's total -> both linked (p10-g2: 10.00 + 10.00 = 20.00).
+    1b) elimination: a review group whose candidate list the claims above shrank to one row of score >= 4 that nobody else lists -> linked.
     2) near amount: one row within `tol` SAR on the receipt's date, unique both ways -> linked (assign_statuses shows AMOUNT_MISMATCH).
     3) no total: a healed receipt with merchant+date but no amount and one same-day row whose merchant overlaps -> review suggestion."""
     links, review = dict(links), {k: list(v) for k, v in review.items()}
-    by_ref = {r["ref"]: r for r in rows}
+    by_ref = {r["ref"]: r for r in rows}; by_id = {g["id"]: g for g in groups}; n0 = {gid: len(c) for gid, c in review.items()}
     def claim(gid, ref):   # link, and take the row(s) out of every other candidate list
         links[gid] = ref; review.pop(gid, None)
         for c in review.values(): c[:] = [(r, s) for r, s in c if r not in _refs(ref)]
+    linked = lambda: {r for v in links.values() for r in _refs(v)}
     blocks = {}
     for gid, cands in review.items():
         if len(cands) > 1 and len({sc for _, sc in cands}) == 1 and cands[0][1] >= 4: blocks.setdefault(frozenset(r for r, _ in cands), []).append(gid)
@@ -263,17 +270,19 @@ def second_pass(groups, rows, links, review, tol=3.0):
         gs = [next(g for g in groups if g["id"] == gid) for gid in gids]; orders = [_inv_order(g) for g in gs]
         if len(gs) != len(refs) or None in orders or len(set(orders)) < len(orders) or not all(_overlap(g, by_ref[r]) for g in gs for r in refs): continue
         for g, ref in zip(sorted(gs, key=_inv_order), sorted(refs, key=lambda r: (by_ref[r]["date"], by_ref[r].get("time") or ""))): claim(g["id"], ref)
-    taken = {r for v in links.values() for r in _refs(v)} | {r for c in review.values() for r, _ in c}
-    left_rows = [r for r in rows if r["kind"] == "purchase" and r["ref"] not in taken]
-    left = [g for g in groups if not links.get(g["id"]) and g["id"] not in review]
-    same_day = lambda g, r: r["date"] in _dates(g)
-    for g in left:
+    for g in [g for g in groups if not links.get(g["id"])]:
         for T in receipt_amounts(g):
-            c = [r for r in left_rows if same_day(g, r)]
+            c = [r for r in rows if r["kind"] == "purchase" and r["ref"] not in linked() and _same_day(g, r)]
             pairs = [(a, b) for i, a in enumerate(c) for b in c[i + 1:] if a["merchant"] == b["merchant"] and abs(_r2(a["amount"] + b["amount"]) - T) <= 0.05]
             if len(pairs) == 1:
-                a, b = pairs[0]; links[g["id"]] = [a["ref"], b["ref"]]; left_rows = [r for r in left_rows if r not in (a, b)]; break
-    left = [g for g in left if not links.get(g["id"])]
+                claim(g["id"], [pairs[0][0]["ref"], pairs[0][1]["ref"]]); break
+    for gid, c in list(review.items()):
+        others = {r for h, cc in review.items() if h != gid for r, _ in cc}
+        if len(c) == 1 < n0[gid] and c[0][1] >= 4 and c[0][0] not in others | linked() and not _looks_multi_document(by_id[gid].get("notes")): claim(gid, c[0][0])
+    parked = {r for c in review.values() for r, _ in c}
+    left_rows = [r for r in rows if r["kind"] == "purchase" and r["ref"] not in linked() | parked]
+    left = [g for g in groups if not links.get(g["id"]) and g["id"] not in review]
+    same_day = _same_day
     real = lambda s: norm_merchant(s) - GENERIC - {"اسواق"}   # "markets" is generic here: the ASDAF alias maps to it
     close = lambda g, r: same_day(g, r) and _amount_diff(g, r) <= tol   # ambiguity is judged on this alone, support or not
     def near(g, r):   # a candidate link: close, within 10% of the row, and the merchant overlaps or the healer was confident

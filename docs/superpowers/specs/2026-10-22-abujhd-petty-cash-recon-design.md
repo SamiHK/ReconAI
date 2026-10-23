@@ -147,6 +147,27 @@ missing, override) that fails if scoring or the greedy pass breaks.
 **Checkpoint B.** Print the summary table and the `REVIEW` list with both candidates' evidence.
 User confirms or writes overrides; rerun B.
 
+## Step B2 — second pass
+
+`second_pass()` runs after pass 1 and touches leftovers only: purchase rows nobody linked and nobody listed for review,
+and receipts with no link and no review entry. Pass 1 results are never changed. Three rules, in order:
+
+1. **Split payment.** Two same-day rows with the identical statement merchant string whose amounts sum to the
+   receipt total within 0.05 (one such pair, unambiguous) are both linked to the receipt.
+2. **Near amount.** A leftover receipt may link to a leftover row only when all hold: same day; the amount differs by at
+   most `min(3.00, 10% of the row amount)`; the merchant overlaps the row's (generic tokens and the "markets"
+   alias removed; 5-char prefixes count) or the healer's `confidence` is at least 0.7; and the pairing is unique both
+   ways against every same-day row and receipt, taken or not. The row shows `AMOUNT_MISMATCH` with
+   `(total differs by X.XX)`, so it is flagged, not promoted to `MATCHED`.
+3. **No total.** A healed receipt with merchant and date but no amount, and exactly one same-day row whose merchant
+   overlaps, becomes a `REVIEW` suggestion for that row. It is never a match.
+
+A `links` value in `matches.json` may therefore be a list of refs (split), and `matches.json` receipts carry `refs`
+alongside `ref`. `overrides.json` `links` cannot express a split: it takes one ref or null per receipt.
+
+Pass-1 amount candidates for unmerged, unhealed groups now come from `common.total_flags` (the ranker that prefers
+total-family keywords), so pass 1 is affected by the ranker too; the September gate showed no change.
+
 ## Step C — `c_report.py`
 
 `report.html`, single self-contained file (CSS inline, images referenced relatively from
@@ -164,6 +185,18 @@ User confirms or writes overrides; rerun B.
 - Everything cites: statement ref, page number, crop id, ledger code.
 
 **Checkpoint C.** User opens `report.html`; one iteration on clarity.
+
+## Regression gate
+
+```
+python scripts/abujhd/check_vs_workbook.py --data data/abujhd --workbook <xlsx> --min-agree 82 --max-wrong 5
+```
+
+Compares `matches.json` with the human reconciliation workbook (sheet "Card statement Sep"), purchase rows only.
+**agree**: our status matches the workbook (Matched "Yes" and we say `MATCHED`/`AMOUNT_MISMATCH`, or blank and we say
+`MISSING_RECEIPT`). **wrong**: we say missing where the workbook found a receipt, or matched where it found none.
+**review**: rows we left to a human; neither agree nor wrong. Exit 1 when agree is below `--min-agree` or wrong is
+above `--max-wrong`. Current September baseline: agree 82, wrong 5, review 17.
 
 ## Out of scope
 

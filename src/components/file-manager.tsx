@@ -27,6 +27,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TABLE_HEAD_BAND,
 } from './ui/table';
 import { resolveUploadTarget, Workspace } from '@/lib/workspace-utils';
 import { isFileParsed, FileWithProcessing } from '@/lib/file-status';
@@ -59,9 +60,6 @@ const ACCEPT_ATTR = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.tiff,.bmp';
 function isAcceptedFile(file: File): boolean {
   return ACCEPTED_TYPES.has(file.type);
 }
-
-// DocAI library table header (uploaded-documents-section.tsx): slate band, white uppercase labels
-const HEAD = 'h-11 bg-[#74737f] px-4 text-[11px] font-bold uppercase tracking-wide text-white hover:bg-[#74737f]';
 
 export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onReconcile }: { 
   kbId: string; 
@@ -538,7 +536,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
           <Table wrapperClassName="overflow-auto">
             <TableHeader>
               <TableRow className="border-0 hover:bg-transparent">
-                <TableHead className={cn(HEAD, "w-10")}>
+                <TableHead className={cn(TABLE_HEAD_BAND, "w-10")}>
                   <input
                     type="checkbox"
                     aria-label="Select all files"
@@ -548,7 +546,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                   />
                 </TableHead>
                 <TableHead
-                  className={cn(HEAD)}
+                  className={cn(TABLE_HEAD_BAND)}
                   aria-sort={sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
                   <button
@@ -562,7 +560,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                   </button>
                 </TableHead>
                 <TableHead
-                  className={cn(HEAD, "whitespace-nowrap")}
+                  className={cn(TABLE_HEAD_BAND, "whitespace-nowrap")}
                   aria-sort={sortKey === 'date' ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
                   <button
@@ -576,7 +574,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                   </button>
                 </TableHead>
                 <TableHead
-                  className={cn(HEAD)}
+                  className={cn(TABLE_HEAD_BAND)}
                   aria-sort={sortKey === 'status' ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
                   <button
@@ -589,7 +587,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                       (sortDir === 'asc' ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />)}
                   </button>
                 </TableHead>
-                <TableHead className={cn(HEAD, "text-right")}>Actions</TableHead>
+                <TableHead className={cn(TABLE_HEAD_BAND, "text-right")}>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>

@@ -26,6 +26,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TABLE_HEAD_BAND,
 } from './ui/table';
 import {
   overbillingTone,
@@ -357,12 +358,12 @@ function FindingsTable({ findings, groups, classifications }: {
     : findings;
 
   return (
-    <div className="rounded-lg border border-border bg-background shadow-sm">
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       {/* Sticky filter bar — pins just below the sticky tab bar (--tabbar-h)
           while the page scrolls (table has NO fixed height; it grows naturally
           and the whole page scrolls, so sticky works against the page, not an
           inner scrollbox) */}
-      <div className="sticky top-[var(--tabbar-h)] z-10 flex flex-wrap gap-4 items-center justify-between px-4 py-3 border-b border-border bg-background rounded-t-lg">
+      <div className="sticky top-[var(--tabbar-h)] z-10 flex flex-wrap gap-4 items-center justify-between px-4 py-3 border-b border-border bg-card rounded-t-xl">
         <div className="flex gap-2 flex-wrap">
           <Input
             placeholder="Filter findings..."
@@ -392,14 +393,14 @@ function FindingsTable({ findings, groups, classifications }: {
         </div>
       </div>
       <Table className="w-full" wrapperClassName="">
-        <TableHeader className="sticky top-[calc(var(--tabbar-h)+61px)] z-10 bg-background">
-          <TableRow className="bg-muted/50 hover:bg-muted/50">
-            {visibleColumns.includes('Status') && <TableHead className="w-[110px]">Status</TableHead>}
-            {visibleColumns.includes('Doc') && <TableHead className="w-[140px]">Doc</TableHead>}
-            {visibleColumns.includes('Description') && <TableHead>Description</TableHead>}
-            {visibleColumns.includes('Expected') && <TableHead className="w-[100px] text-right">Expected</TableHead>}
-            {visibleColumns.includes('Actual') && <TableHead className="w-[100px] text-right">Actual</TableHead>}
-            {visibleColumns.includes('Evidence') && <TableHead className="w-[130px] text-right">Evidence</TableHead>}
+        <TableHeader className="sticky top-[calc(var(--tabbar-h)+61px)] z-10">
+          <TableRow className="border-0 hover:bg-transparent">
+            {visibleColumns.includes('Status') && <TableHead className={cn(TABLE_HEAD_BAND, 'w-[110px]')}>Status</TableHead>}
+            {visibleColumns.includes('Doc') && <TableHead className={cn(TABLE_HEAD_BAND, 'w-[140px]')}>Doc</TableHead>}
+            {visibleColumns.includes('Description') && <TableHead className={TABLE_HEAD_BAND}>Description</TableHead>}
+            {visibleColumns.includes('Expected') && <TableHead className={cn(TABLE_HEAD_BAND, 'w-[100px] text-right')}>Expected</TableHead>}
+            {visibleColumns.includes('Actual') && <TableHead className={cn(TABLE_HEAD_BAND, 'w-[100px] text-right')}>Actual</TableHead>}
+            {visibleColumns.includes('Evidence') && <TableHead className={cn(TABLE_HEAD_BAND, 'w-[130px] text-right')}>Evidence</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -407,7 +408,7 @@ function FindingsTable({ findings, groups, classifications }: {
             filtered.map(f => (
               <TableRow key={f.id}>
                 {visibleColumns.includes('Status') && (
-                  <TableCell className="whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap">
                     <TooltipProvider>
                       <Tooltip>
                         <TooltipTrigger render={<Badge variant="outline" />} className={`uppercase text-xs ${severityBadgeColors[f.severity] ?? severityBadgeColors.low}`}>
@@ -419,21 +420,21 @@ function FindingsTable({ findings, groups, classifications }: {
                   </TableCell>
                 )}
                 {visibleColumns.includes('Doc') && (
-                  <TableCell className="whitespace-nowrap">
+                  <TableCell className="px-4 py-3 whitespace-nowrap">
                     <span className="text-xs text-muted-foreground font-mono">{f.document}</span>
                   </TableCell>
                 )}
                 {visibleColumns.includes('Description') && (
-                  <TableCell className="min-w-[260px] text-sm leading-relaxed">{f.description}</TableCell>
+                  <TableCell className="min-w-[260px] px-4 py-3 text-sm leading-relaxed">{f.description}</TableCell>
                 )}
                 {visibleColumns.includes('Expected') && (
-                  <TableCell className="text-right font-mono whitespace-nowrap">{f.expected ?? '-'}</TableCell>
+                  <TableCell className="px-4 py-3 text-right font-mono whitespace-nowrap">{f.expected ?? '-'}</TableCell>
                 )}
                 {visibleColumns.includes('Actual') && (
-                  <TableCell className="text-right font-mono whitespace-nowrap">{f.actual ?? '-'}</TableCell>
+                  <TableCell className="px-4 py-3 text-right font-mono whitespace-nowrap">{f.actual ?? '-'}</TableCell>
                 )}
                 {visibleColumns.includes('Evidence') && (
-                  <TableCell className="text-right whitespace-nowrap">
+                  <TableCell className="px-4 py-3 text-right whitespace-nowrap">
                     <EvidenceButton finding={f} group={groupByFinding.get(f.id) || null} classifications={classifications} />
                   </TableCell>
                 )}

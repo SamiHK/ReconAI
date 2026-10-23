@@ -48,3 +48,36 @@ export async function canAccessKb(kbId: string, apiKey: string, listKbs: () => P
   accessCache.set(key, { ok, at: Date.now() });
   return ok;
 }
+
+/** b_match.py prints "rows: {'MATCHED': 76, ...}" and "receipts: {...}"; read those counts, ignore everything else. */
+export function parseRunSummary(stdout: string): { rows: Record<string, number>; receipts: Record<string, number> } {
+  const read = (label: string): Record<string, number> => {
+    const line = stdout.split('\n').find(l => l.startsWith(`${label}: {`));
+    if (!line) return {};
+    const out: Record<string, number> = {};
+    for (const m of line.slice(label.length + 2).matchAll(/'([A-Z_]+)': (\d+)/g)) out[m[1]] = Number(m[2]);
+    return out;
+  };
+  return { rows: read('rows'), receipts: read('receipts') };
+}
+
+const running = new Set<string>();   // ponytail: one run per folder at a time, in-process only (single dev server)
+
+/** Run b_match.py then c_report.py for one data folder with the repo's venv python. Rejects while a run is in flight. */
+export async function runPettyCash(repoRoot: string, folder: string): Promise<{ stdout: string; durationMs: number }> {
+  if (running.has(folder)) throw new Error('A run is already in progress for this workspace');
+  running.add(folder);
+  const started = Date.now();
+  try {
+    const { execFile } = await import('node:child_process');
+    const { promisify } = await import('node:util');
+    const run = promisify(execFile);
+    const python = existsSync(join(repoRoot, '.venv/bin/python')) ? join(repoRoot, '.venv/bin/python') : 'python3';
+    const dataArg = ['--data', folder];
+    const match = await run(python, [join(repoRoot, 'scripts/abujhd/b_match.py'), ...dataArg], { cwd: repoRoot, timeout: 120_000, maxBuffer: 8 * 1024 * 1024 });
+    await run(python, [join(repoRoot, 'scripts/abujhd/c_report.py'), ...dataArg], { cwd: repoRoot, timeout: 120_000, maxBuffer: 8 * 1024 * 1024 });
+    return { stdout: match.stdout, durationMs: Date.now() - started };
+  } finally {
+    running.delete(folder);
+  }
+}

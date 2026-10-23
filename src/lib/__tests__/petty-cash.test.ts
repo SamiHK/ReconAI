@@ -88,3 +88,19 @@ describe('canAccessKb', () => {
     expect(calls).toBe(2);
   });
 });
+
+import { parseRunSummary } from '../petty-cash';
+
+describe('parseRunSummary', () => {
+  test("reads b_match's two summary lines into counts", () => {
+    const out = "rows: {'MATCHED': 76, 'REVIEW': 14, 'MISSING_RECEIPT': 9, 'UNEXPLAINED': 19, 'TIED': 6, 'AMOUNT_MISMATCH': 5}\nreceipts: {'LINKED': 79, 'ORPHAN': 67, 'REVIEW': 26}\ntieout: {...}\nREVIEW p05-g2 [...]\n";
+    expect(parseRunSummary(out)).toEqual({
+      rows: { MATCHED: 76, REVIEW: 14, MISSING_RECEIPT: 9, UNEXPLAINED: 19, TIED: 6, AMOUNT_MISMATCH: 5 },
+      receipts: { LINKED: 79, ORPHAN: 67, REVIEW: 26 },
+    });
+  });
+  test('tolerates missing or malformed lines', () => {
+    expect(parseRunSummary('')).toEqual({ rows: {}, receipts: {} });
+    expect(parseRunSummary('rows: not a dict\n')).toEqual({ rows: {}, receipts: {} });
+  });
+});

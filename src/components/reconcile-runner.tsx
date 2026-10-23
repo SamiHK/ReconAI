@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTheme } from 'next-themes';
 import { Card } from './ui/card';
+import { Button } from './ui/button';
 import { ReportViewer } from './report-viewer';
 import { ReconciliationReport } from '@/engine/reconcile';
 import { getRunState, setRunState, subscribeRunState, EMPTY_RUN_STATE } from '@/lib/run-store';
@@ -274,6 +275,23 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
 
   const [pettyCashUrl, setPettyCashUrl] = useState<string | null>(null);
   const [showPettyCash, setShowPettyCash] = useState(false);
+  const [pettyRun, setPettyRun] = useState<{ busy: boolean; note: string | null; error: string | null; version: number }>({ busy: false, note: null, error: null, version: 0 });
+
+  // Re-run the matcher and report on the server, then reload the pane (the ?v= query busts the iframe's cached document).
+  const runPettyCash = async () => {
+    setPettyRun(s => ({ ...s, busy: true, note: null, error: null }));
+    try {
+      const res = await fetch(`/api/petty-cash/${kbId}/run`, { method: 'POST' });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body.error || 'Run failed');
+      const r = body.rows || {};
+      const note = `Matched ${r.MATCHED ?? 0} · Needs a decision ${r.REVIEW ?? 0} · Missing receipt ${r.MISSING_RECEIPT ?? 0} · ${(body.durationMs / 1000).toFixed(1)}s`;
+      setPettyRun(s => ({ busy: false, note, error: null, version: s.version + 1 }));
+      setShowPettyCash(true);
+    } catch (e) {
+      setPettyRun(s => ({ ...s, busy: false, error: e instanceof Error ? e.message : 'Run failed' }));
+    }
+  };
   const { resolvedTheme } = useTheme();
   const frameRef = useRef<HTMLIFrameElement>(null);
   // The report keys its dark tokens off :root.dark; mirror the app's theme onto the iframe document.
@@ -306,20 +324,27 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
       <div className="mb-4 flex items-center justify-between gap-3">
         <h2 className="text-h3">Report</h2>
         {pettyCashUrl && (
-          <button
-            type="button"
-            onClick={() => setShowPettyCash(v => !v)}
-            className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
-          >
-            {showPettyCash ? 'Back to reconciliation' : 'Petty-cash report'}
-          </button>
+          <div className="flex items-center gap-2">
+            {pettyRun.note && <span className="text-xs text-muted-foreground">{pettyRun.note}</span>}
+            {pettyRun.error && <span className="text-xs text-destructive">{pettyRun.error}</span>}
+            <Button size="sm" onClick={runPettyCash} disabled={pettyRun.busy} aria-busy={pettyRun.busy}>
+              {pettyRun.busy ? 'Running…' : 'Run petty-cash reconciliation'}
+            </Button>
+            <button
+              type="button"
+              onClick={() => setShowPettyCash(v => !v)}
+              className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              {showPettyCash ? 'Back to reconciliation' : 'Petty-cash report'}
+            </button>
+          </div>
         )}
       </div>
       {showPettyCash && pettyCashUrl ? (
         <iframe
           ref={frameRef}
           onLoad={syncFrameTheme}
-          src={pettyCashUrl}
+          src={pettyRun.version ? `${pettyCashUrl}?v=${pettyRun.version}` : pettyCashUrl}
           title="Petty-cash report"
           className="w-full rounded-xl border border-border bg-white"
           style={{ height: 'calc(100vh - 160px)' }}

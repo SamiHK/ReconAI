@@ -163,6 +163,14 @@ def score(g, row):
 _MULTI_DOC = re.compile(r"more than one|multiple documents|two documents|two receipts|separate receipts", re.I)
 _ATTACHED_SLIP = re.compile(r"card slip|pos slip|card/pos|pos/card|mada|point[- ]of[- ]sale|payment slip|terminal receipt", re.I)
 
+_CASH = re.compile(r"\bcash\b|نقد|كاش", re.I)
+
+def _cash_after(g, row):
+    """A receipt dated after the card charge and marked cash is not that charge's receipt (p64-g1: a 21/09 cash invoice vs a 20/09 card row):
+    it stays a suggestion for a human, never a MATCHED link."""
+    ds = _dates(g)
+    return bool(ds) and ds[0] > row["date"] and bool(_CASH.search(f"{g.get('text') or ''} {g.get('notes') or ''}"))
+
 def _looks_multi_document(notes):
     """A healer note about two documents forces review, unless the second one is the purchase's own card/POS slip."""
     n = notes or ""
@@ -208,7 +216,7 @@ def match_receipts(groups, rows, overrides):
         if rival:
             contested.add(row_ref)
         # healer saw several documents in one crop: its fields describe only one of them, so a human decides
-        if top < 4 or tie or rival or row_ref in contested or _looks_multi_document(g.get("notes")):
+        if top < 4 or tie or rival or row_ref in contested or _looks_multi_document(g.get("notes")) or _cash_after(g, next(r for r in rows if r["ref"] == row_ref)):
             links[gid] = None; review[gid] = [(r, s) for s, r in scored[:3]]
         else:
             links[gid] = row_ref; taken.add(row_ref)

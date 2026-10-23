@@ -544,6 +544,24 @@ def test_same_minute_receipt_links_within_three_sar_without_a_name():
     h["fields"]["time"] = None
     assert second_pass([h], [row], {"h": None}, {})[0]["h"] is None
 
+def test_cash_receipt_dated_after_the_card_charge_is_a_suggestion_not_a_match():
+    # p64-g1: Munhali invoice 8780, 16.00, dated 21/09 08:51 and marked cash; the 16.00 ASDAF card row is 20/09 07:44
+    row = R("r", 16.0, "2026-09-20", "ASDAF ALMUHITAl Oyoun FirsAL A", time="07:44:54")
+    g = _left([G("g", 64, [16.0], ["2026-09-21"], "مؤسسة تموينات عارف بن سعيد", kind="invoice", notes="Single Saudi VAT invoice; payment is marked as cash.",
+                 fields={"merchant": "مؤسسة تموينات عارف بن سعيد", "date": "2026-09-21", "time": "08:51", "total": 16.0})])[0]
+    g["text"] = "فاتورة ضريبية\nالتاريخ 2026/09/21\nنقداً\nالإجمالي 16.00"
+    links, review = match_receipts([g], [row], {})
+    assert links["g"] is None and review["g"] == [("r", 4)], (links, review)
+    links, review = second_pass([g], [row], links, review)
+    assert links["g"] is None and review["g"] == [("r", 4)], (links, review)       # the suggestion survives the second pass
+    rows2, rc = assign_statuses([row], [g], links, review, tie_out_ledger([row], []), [])
+    assert rows2[0]["status"] == "REVIEW" and rc[0]["status"] == "REVIEW"
+    # dated the day before the charge, or card-paid the day after: still a match
+    before = {**g, "fields": {**g["fields"], "date": "2026-09-19"}, "dates": ["2026-09-19"]}
+    assert match_receipts([before], [row], {})[0]["g"] == "r"
+    card = {**g, "notes": "Single invoice with an attached mada slip.", "text": "فاتورة ضريبية\nالتاريخ 2026/09/21\nمدى\nالإجمالي 16.00"}
+    assert match_receipts([card], [row], {})[0]["g"] == "r"
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

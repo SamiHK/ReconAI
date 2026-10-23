@@ -18,14 +18,24 @@ const SOURCE_TABS: Array<{ key: Source; label: string }> = [
 ];
 
 /** Docked evidence pane: file header, zoom, jump-to-citation, and Statement / Receipt / Ledger tabs for one selection. */
-export function CitationPane({ report, kbId, sources, initialSource, onClose }: {
+export function CitationPane({ report, kbId, sources, initialSource, onClose, autoFocusClose = false }: {
   report: PettyReport;
   kbId: string;
   sources: PaneSources;
   initialSource: Source;
   onClose: () => void;
+  /** The narrow-screen overlay is modal: move focus to the close button when it opens. */
+  autoFocusClose?: boolean;
 }) {
-  const [source, setSource] = useState<Source>(initialSource);
+  const available: Record<Source, boolean> = {
+    statement: sources.statement.length > 0,
+    receipt: sources.receipts.length > 0,
+    ledger: sources.ledger !== null,
+  };
+  // Never open on a disabled tab: fall back to the first source that has evidence.
+  const [source, setSource] = useState<Source>(
+    () => (available[initialSource] ? initialSource : (SOURCE_TABS.map(t => t.key).find(k => available[k]) ?? initialSource))
+  );
   const [zoom, setZoom] = useState(100);
   const [jump, setJump] = useState(0);
   const [pageInView, setPageInView] = useState<number | null>(null);
@@ -39,11 +49,6 @@ export function CitationPane({ report, kbId, sources, initialSource, onClose }: 
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
 
-  const available: Record<Source, boolean> = {
-    statement: sources.statement.length > 0,
-    receipt: sources.receipts.length > 0,
-    ledger: sources.ledger !== null,
-  };
   const isPages = source !== 'ledger';
   const images = isPages
     ? (source === 'statement' ? report.meta.page_images.statement : report.meta.page_images.receipts).map(p => imageUrl(kbId, p))
@@ -77,7 +82,7 @@ export function CitationPane({ report, kbId, sources, initialSource, onClose }: 
             </Button>
           </div>
         )}
-        <Button variant="ghost" size="icon-sm" title="Close" aria-label="Close evidence pane" onClick={onClose}>
+        <Button variant="ghost" size="icon-sm" title="Close" aria-label="Close evidence pane" autoFocus={autoFocusClose} onClick={onClose}>
           <XIcon className="size-4" />
         </Button>
       </div>
@@ -105,9 +110,10 @@ export function CitationPane({ report, kbId, sources, initialSource, onClose }: 
             </button>
           ))}
         </div>
-        <p className="min-w-0 flex-1 truncate text-right text-[11px] text-muted-foreground" title={fileName}>
-          {fileName}
-          {isPages && images.length > 0 && ` · page ${pageInView ?? citedPage} of ${images.length}`}
+        <p className="flex min-w-0 flex-1 items-baseline justify-end gap-1 text-[11px] text-muted-foreground">
+          <span className="truncate" title={fileName}>{fileName}</span>
+          {/* The counter never truncates: a long file name loses its tail, not the page number. */}
+          {isPages && images.length > 0 && <span className="shrink-0">· page {pageInView ?? citedPage} of {images.length}</span>}
         </p>
       </div>
       <div className="min-h-0 flex-1">

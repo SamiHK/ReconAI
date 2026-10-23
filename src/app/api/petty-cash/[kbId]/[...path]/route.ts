@@ -31,7 +31,9 @@ export async function GET(
   return new Response(readFileSync(file), {
     headers: {
       'Content-Type': json ? 'application/json; charset=utf-8' : 'image/png',
-      'Cache-Control': 'no-store',
+      // report.json is rewritten by a Run; page and crop PNGs are written only by a_refine.py, which the app never runs.
+      'Cache-Control': json ? 'no-store' : 'private, max-age=3600',
+      'X-Content-Type-Options': 'nosniff',
     },
   });
 }

@@ -8,7 +8,8 @@ import {
 } from '@/lib/petty-cash-report';
 import { CitationChip, FilterChip, StatusChip } from './chips';
 
-export function ReceiptsTable({ report, kbId, selection, onSelect }: { report: PettyReport; kbId: string; selection: Selection | null; onSelect: (s: Selection) => void }) {
+/** `compact` drops the Receipt date column and the merchant part of candidate chips so the table fits beside the docked pane. */
+export function ReceiptsTable({ report, kbId, selection, onSelect, compact = false }: { report: PettyReport; kbId: string; selection: Selection | null; onSelect: (s: Selection) => void; compact?: boolean }) {
   const [status, setStatus] = useState('ALL');
   const counts = useMemo(() => countByStatus(report.receipts), [report.receipts]);
   const visible = useMemo(() => filterReceipts(report.receipts, status), [report.receipts, status]);
@@ -18,7 +19,7 @@ export function ReceiptsTable({ report, kbId, selection, onSelect }: { report: P
   const rowChip = (ref: string, score?: number) => {
     const row = rowByRef(report, ref);
     const label = row
-      ? `${row.date} · ${money(row.amount)}${score === undefined ? '' : ` · ${row.merchant.slice(0, 24)} · score ${score}`}`
+      ? `${row.date} · ${money(row.amount)}${score === undefined ? '' : compact ? ` · score ${score}` : ` · ${row.merchant.slice(0, 24)} · score ${score}`}`
       : ref;
     return (
       <CitationChip
@@ -56,7 +57,7 @@ export function ReceiptsTable({ report, kbId, selection, onSelect }: { report: P
             <TableRow>
               <TableHead className={TABLE_HEAD_BAND}>Status</TableHead>
               <TableHead className={TABLE_HEAD_BAND}>Receipt</TableHead>
-              <TableHead className={TABLE_HEAD_BAND}>Receipt date</TableHead>
+              {!compact && <TableHead className={TABLE_HEAD_BAND}>Receipt date</TableHead>}
               <TableHead className={cn(TABLE_HEAD_BAND, 'text-right')}>Amount</TableHead>
               <TableHead className={TABLE_HEAD_BAND}>Merchant</TableHead>
               <TableHead className={TABLE_HEAD_BAND}>Statement rows</TableHead>
@@ -65,7 +66,7 @@ export function ReceiptsTable({ report, kbId, selection, onSelect }: { report: P
           <TableBody>
             {visible.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">No receipts match</TableCell>
+                <TableCell colSpan={compact ? 5 : 6} className="py-6 text-center text-muted-foreground">No receipts match</TableCell>
               </TableRow>
             )}
             {visible.map(g => (
@@ -80,7 +81,6 @@ export function ReceiptsTable({ report, kbId, selection, onSelect }: { report: P
                   {/* A real button: an orphan receipt has no statement chip, so this is the keyboard route into the pane. */}
                   <button
                     type="button"
-                    aria-label={`Open receipt ${g.id} on page ${g.page}`}
                     onClick={e => {
                       e.stopPropagation();
                       onSelect({ kind: 'receipt', id: g.id, source: 'receipt' });
@@ -94,7 +94,7 @@ export function ReceiptsTable({ report, kbId, selection, onSelect }: { report: P
                     <span className="font-mono text-xs">p{g.page} · {g.id}</span>
                   </button>
                 </TableCell>
-                <TableCell className="font-mono text-xs">{g.date ?? <span className="text-muted-foreground">no date</span>}</TableCell>
+                {!compact && <TableCell className="font-mono text-xs">{g.date ?? <span className="text-muted-foreground">no date</span>}</TableCell>}
                 <TableCell className="text-right font-mono text-xs tabular-nums">{amountCell(g)}</TableCell>
                 <TableCell className="max-w-[220px]">
                   {g.merchant ? <div className="truncate" title={g.merchant}>{g.merchant}</div> : <span className="text-muted-foreground">no merchant read</span>}

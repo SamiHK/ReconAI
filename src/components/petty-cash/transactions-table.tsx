@@ -71,7 +71,7 @@ export function TransactionsTable({ rows, selection, onSelect, compact = false }
                 <TableCell className="whitespace-nowrap font-mono text-xs">
                   <div className="flex items-center gap-1.5">
                     {r.date}
-                    {r.orange && <span className="size-2 rounded-full bg-amber-500" title="Highlighted on the statement" />}
+                    {r.orange && <span role="img" aria-label="Highlighted on the statement" className="size-2 rounded-full bg-amber-500" title="Highlighted on the statement" />}
                   </div>
                   <div className="text-muted-foreground">{(r.time ?? '').slice(0, 5)}</div>
                 </TableCell>

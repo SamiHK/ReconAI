@@ -73,6 +73,16 @@ export function PettyCashReport({ kbId, version }: { kbId: string; version: numb
   const closePane = useCallback(() => setSelection(null), []);
   const onSelect = useCallback((s: Selection) => setSelection(s), []);
   const isLarge = useIsLarge();
+  const overlayOpen = Boolean(selection) && !isLarge;
+  // The narrow overlay is modal: lock the document's scroll while it is up.
+  useEffect(() => {
+    if (!overlayOpen) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [overlayOpen]);
 
   if (state.error) {
     return (
@@ -104,7 +114,7 @@ export function PettyCashReport({ kbId, version }: { kbId: string; version: numb
   const k = report.kpis;
   const built = new Date(report.meta.built_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
   const pane = sources && selection
-    ? <CitationPane key={selectionKey} report={report} kbId={kbId} sources={sources} initialSource={selection.source} onClose={closePane} />
+    ? <CitationPane key={selectionKey} report={report} kbId={kbId} sources={sources} initialSource={selection.source} onClose={closePane} autoFocusClose={!isLarge} />
     : null;
 
   return (
@@ -140,13 +150,16 @@ export function PettyCashReport({ kbId, version }: { kbId: string; version: numb
       <div className={cn('gap-4', sources && isLarge && 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(420px,45%)]')}>
         <div className="min-w-0">
           {tab === 'transactions' && <TransactionsTable rows={report.rows} selection={selection} onSelect={onSelect} compact={Boolean(sources)} />}
-          {tab === 'receipts' && <ReceiptsTable report={report} kbId={kbId} selection={selection} onSelect={onSelect} />}
+          {tab === 'receipts' && <ReceiptsTable report={report} kbId={kbId} selection={selection} onSelect={onSelect} compact={Boolean(sources)} />}
           {tab === 'ledger' && <LedgerTable report={report} />}
         </div>
         {pane && (isLarge
-          ? <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-7rem)]">{pane}</div>
+          ? <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-2rem)]">{pane}</div>
           // Portal: the sidebar rail is a z-30 sticky element in the root stacking context, which the report's own context cannot climb above.
-          : createPortal(<div className="fixed inset-0 z-50 bg-background/95 p-3">{pane}</div>, document.body))}
+          : createPortal(
+              <div role="dialog" aria-modal="true" aria-label="Evidence" className="fixed inset-0 z-50 bg-background/95 p-3">{pane}</div>,
+              document.body
+            ))}
       </div>
     </div>
   );

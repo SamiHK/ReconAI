@@ -27,6 +27,8 @@ export function PageStack({ images, boxes, activeIndex, jumpSignal, zoom, onPage
   const scrollRef = useRef<HTMLDivElement>(null);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
   const rafRef = useRef<number | null>(null);
+  const lastJump = useRef(jumpSignal);
+  const lastZoom = useRef(zoom);
   const [containerWidth, setContainerWidth] = useState(0);
   // Per-image state keyed by src, so switching the stack to another file (statement ↔ receipts) never reuses a
   // stale aspect or a stale failure from the previous file's page with the same number.
@@ -52,16 +54,20 @@ export function PageStack({ images, boxes, activeIndex, jumpSignal, zoom, onPage
     return () => ro.disconnect();
   }, []);
 
-  // Centre the primary box. Offsets are read from the page element, so they are right at every zoom.
-  useEffect(() => {
+  // Centre the primary box. Offsets are read from the page element, so they are right at every zoom. Instant on
+  // mount, on a new citation and when the cited image reports its size; smooth only for Jump and zoom, because an
+  // animated first scroll drags every page on the way into the lazy-load margin.
+  useLayoutEffect(() => {
     const scroller = scrollRef.current;
     const pageEl = active ? pageRefs.current.get(active.page) : null;
     if (!scroller || !pageEl || !active) return;
+    const animated = (jumpSignal !== lastJump.current || zoom !== lastZoom.current) && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    lastJump.current = jumpSignal;
+    lastZoom.current = zoom;
     const [x0, y0, x1, y1] = active.box;
     const top = pageEl.offsetTop + ((y0 + y1) / 2000) * pageEl.offsetHeight - scroller.clientHeight / 2;
     const left = pageEl.offsetLeft + ((x0 + x1) / 2000) * pageEl.offsetWidth - scroller.clientWidth / 2;
-    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    scroller.scrollTo({ top: Math.max(0, top), left: Math.max(0, left), behavior: reduced ? 'auto' : 'smooth' });
+    scroller.scrollTo({ top: Math.max(0, top), left: Math.max(0, left), behavior: animated ? 'smooth' : 'auto' });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeKey, jumpSignal, zoom, pageWidth, citedLoaded]);
 

@@ -12,33 +12,33 @@ sys.path.insert(0, str(pathlib.Path(__file__).parent))
 import common
 from common import load_json
 
-FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">'
+FONTS = '<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">'
 
 CSS = """
-:root{--page:#F2F2F2;--card:#FFFFFF;--ink:#151515;--mute:#8C8C8C;--line:#E0E0E0;--blue:#2F6DB2;--blue-h:#1D6FB3;--navy:#033659;--deep:#02091F;
- --ok:#0A7F3F;--bad:#B42318;--rev:#2F6DB2;--warn:#A15C00;--neutral:#8C8C8C;--tint:12%;--shadow:0 1px 2px rgba(2,9,31,.06)}
-@media(prefers-color-scheme:dark){:root{--page:#141414;--card:#212121;--ink:#F2F2F2;--mute:#A3A3A3;--line:#2E2E2E;--ok:#3DAA6A;--bad:#E06A5F;--rev:#6DA4E3;--warn:#D39A3C;--neutral:#A3A3A3;--tint:18%;--shadow:none}}
+:root{--page:#F5F5F5;--card:#FFFFFF;--ink:#151515;--mute:#71717A;--line:#E4E4E7;--blue:#554BC5;--blue-h:#4239A9;--navy:#4239A9;--deep:#554BC5;
+ --ok:#0A7F3F;--bad:#B42318;--rev:#554BC5;--warn:#A15C00;--neutral:#71717A;--tint:12%;--shadow:0 1px 2px rgba(0,0,0,.04)}
+@media(prefers-color-scheme:dark){:root{--page:hsl(247 18% 10%);--card:oklch(0.21 0.006 285.885);--ink:#F2F2F2;--mute:#A1A1AA;--line:rgba(255,255,255,.1);--blue:#7368E6;--blue-h:#9A92EF;--ok:#3DAA6A;--bad:#E06A5F;--rev:#9A92EF;--warn:#D39A3C;--neutral:#A1A1AA;--tint:18%;--shadow:none}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--page);color:var(--ink);font:14px/1.5 Geist,ui-sans-serif,system-ui,sans-serif}
-.hero{background:var(--deep);color:#fff;padding:40px 32px 32px;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:48px 48px}
+body{margin:0;background:var(--page);color:var(--ink);font:14px/1.5 "DM Sans",ui-sans-serif,system-ui,sans-serif}
+.hero{background:linear-gradient(180deg,#554BC5,#4239A9);color:#fff;padding:40px 32px 32px;background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);background-size:48px 48px}
 .hero .top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap}
-.hero h1{font:400 40px/1.1 Archivo,ui-sans-serif,system-ui,sans-serif;margin:0 0 12px;letter-spacing:-.01em}
+.hero h1{font:600 40px/1.1 "DM Sans",ui-sans-serif,system-ui,sans-serif;margin:0 0 12px;letter-spacing:-.01em}
 .hero p{margin:12px 0 0;max-width:760px;color:rgba(255,255,255,.78)}
-.lock{font:500 13px Geist,sans-serif;color:rgba(255,255,255,.7);white-space:nowrap;padding-top:14px}
+.lock{font:500 13px "DM Sans",sans-serif;color:rgba(255,255,255,.7);white-space:nowrap;padding-top:14px}
 .lock b{color:#fff;font-weight:600;letter-spacing:-.01em}.lock i{display:inline-block;width:0;height:0;border-left:9px solid var(--blue-h);border-top:6px solid transparent;border-bottom:6px solid transparent;margin-left:2px;vertical-align:-1px;filter:drop-shadow(0 0 6px rgba(109,187,255,.6))}
 .pills{display:flex;gap:8px;flex-wrap:wrap}.pill{border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:3px 12px;font-size:12px;color:rgba(255,255,255,.85)}
 main{padding:24px 32px 48px;max-width:1440px;margin:0 auto}
-h2{font:400 22px/1.2 Archivo,ui-sans-serif,system-ui,sans-serif;margin:36px 0 12px;letter-spacing:-.01em}h2 small{font:400 13px Geist,sans-serif;color:var(--mute);margin-left:8px}
+h2{font:600 22px/1.2 "DM Sans",ui-sans-serif,system-ui,sans-serif;margin:36px 0 12px;letter-spacing:-.01em}h2 small{font:400 13px "DM Sans",sans-serif;color:var(--mute);margin-left:8px}
 .grid{display:grid;gap:16px}.g4{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}.g3{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px 18px;box-shadow:var(--shadow)}
-.tile .k{font-size:12px;color:var(--mute);font-weight:500;text-transform:uppercase;letter-spacing:.04em}.tile .v{font:400 32px/1.15 Archivo,sans-serif;margin:6px 0 2px;font-variant-numeric:tabular-nums}.tile .s{font-size:12px;color:var(--mute)}
-.card h3{font:600 13px Geist,sans-serif;margin:0 0 10px;color:var(--ink)}.card .note{font-size:12px;color:var(--mute);margin-top:8px}
-svg text{font-family:Geist,ui-sans-serif,system-ui,sans-serif}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;box-shadow:var(--shadow)}
+.tile .k{font-size:12px;color:var(--mute);font-weight:500;text-transform:uppercase;letter-spacing:.04em}.tile .v{font:600 32px/1.15 "DM Sans",sans-serif;margin:6px 0 2px;font-variant-numeric:tabular-nums}.tile .s{font-size:12px;color:var(--mute)}
+.card h3{font:600 13px "DM Sans",sans-serif;margin:0 0 10px;color:var(--ink)}.card .note{font-size:12px;color:var(--mute);margin-top:8px}
+svg text{font-family:"DM Sans",ui-sans-serif,system-ui,sans-serif}
 .legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--mute);margin-top:10px}.legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 details{margin-top:10px;font-size:12px}summary{cursor:pointer;color:var(--blue)}details table td,details table th{font-size:12px;padding:3px 6px}
 .tbl{overflow:auto}table{border-collapse:collapse;width:100%}th,td{border-top:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top;font-size:13px}
 tr:first-child th{border-top:0}th{color:var(--mute);font-weight:500;font-size:12px}.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
-.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 10px 2px 7px;border-radius:999px;font-size:11.5px;font-weight:600;white-space:nowrap;color:var(--c);background:color-mix(in srgb,var(--c) var(--tint),transparent)}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:2px 10px 2px 7px;border-radius:6px;font-size:11.5px;font-weight:600;white-space:nowrap;color:var(--c);background:color-mix(in srgb,var(--c) var(--tint),transparent)}
 .chip b{font-weight:700}
 .thumb{height:56px;border:1px solid var(--line);border-radius:6px;cursor:zoom-in;margin:2px 4px 2px 0;background:#fff}.strip{height:22px;max-width:260px;object-fit:cover;object-position:left}
 .ev{min-width:300px}.ev div{font-size:12px;color:var(--mute);display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:2px 0}.ev b{flex:0 0 66px;font-weight:500;color:var(--mute)}
@@ -62,7 +62,7 @@ STATUS = {
     "REVIEW": ("Needs a decision", "?", "var(--rev)"),
     "UNEXPLAINED": ("Not in ledger", "!", "var(--warn)"), "AMOUNT_MISMATCH": ("Amounts differ", "!", "var(--warn)"),
 }
-HEX = {"var(--ok)": "#0A7F3F", "var(--bad)": "#B42318", "var(--rev)": "#2F6DB2", "var(--warn)": "#A15C00", "var(--neutral)": "#8C8C8C"}
+HEX = {"var(--ok)": "#0A7F3F", "var(--bad)": "#B42318", "var(--rev)": "#554BC5", "var(--warn)": "#A15C00", "var(--neutral)": "#8C8C8C"}
 
 def esc(s): return "" if s is None else html.escape(str(s))
 def money(x): return f"{x:,.2f}" if isinstance(x, (int, float)) else ""

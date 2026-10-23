@@ -108,43 +108,46 @@ export function PettyCashReport({ kbId, version }: { kbId: string; version: numb
     : null;
 
   return (
-    <div className={cn('gap-4', sources && isLarge && 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(420px,45%)]')}>
-      <div className="min-w-0 space-y-4">
-        <header>
-          <h3 className="text-h3">{report.meta.client} · {report.meta.month_label}</h3>
-          <p className="text-xs text-muted-foreground">Statement · receipts · ledger · built {built}</p>
-        </header>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <div className="space-y-4">
+      <header>
+        <h3 className="text-h3">{report.meta.client} · {report.meta.month_label}</h3>
+        <p className="text-xs text-muted-foreground">Statement · receipts · ledger · built {built}</p>
+      </header>
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           <Tile label="Card spend" value={money(k.card_spend)} sub={`SAR · ${k.purchase_count} purchases + ${k.atm_count} ATM withdrawals`} />
           <Tile label="Evidenced" value={pct(k.evidenced_amount, k.purchases_amount)} sub={`${money(k.evidenced_amount)} of ${money(k.purchases_amount)} SAR has a matched receipt`} />
           <Tile label="Open gap" value={money(k.open_gap)} sub={`ledger roll-up ${money(k.rollup)} minus card spend`} />
-          <Tile label="Receipts to find" value={String(k.missing_count)} sub={`${money(k.missing_amount)} SAR without a receipt`} />
-        </div>
-        <div role="tablist" className="flex flex-wrap gap-1">
-          {TABS.map(t => (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={tab === t.key}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                'h-8 rounded-full px-3 text-sm font-medium transition-colors',
-                tab === t.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
-              )}
-            >
-              {t.label} <span className="tabular-nums opacity-70">{t.count(report)}</span>
-            </button>
-          ))}
-        </div>
-        {tab === 'transactions' && <TransactionsTable rows={report.rows} selection={selection} onSelect={onSelect} compact={Boolean(sources)} />}
-        {tab === 'receipts' && <ReceiptsTable report={report} kbId={kbId} selection={selection} onSelect={onSelect} />}
-        {tab === 'ledger' && <LedgerTable report={report} />}
+        <Tile label="Receipts to find" value={String(k.missing_count)} sub={`${money(k.missing_amount)} SAR without a receipt`} />
       </div>
-      {pane && (isLarge
-        ? <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-7rem)]">{pane}</div>
-        // Portal: the sidebar rail is a z-30 sticky element in the root stacking context, which the report's own context cannot climb above.
-        : createPortal(<div className="fixed inset-0 z-50 bg-background/95 p-3">{pane}</div>, document.body))}
+      <div role="tablist" className="flex flex-wrap gap-1">
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
+            onClick={() => setTab(t.key)}
+            className={cn(
+              'h-8 rounded-full px-3 text-sm font-medium transition-colors',
+              tab === t.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+            )}
+          >
+            {t.label} <span className="tabular-nums opacity-70">{t.count(report)}</span>
+          </button>
+        ))}
+      </div>
+      {/* The two-column grid starts at the table block, so the docked pane's top lines up with the table, not the page header. */}
+      <div className={cn('gap-4', sources && isLarge && 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(420px,45%)]')}>
+        <div className="min-w-0">
+          {tab === 'transactions' && <TransactionsTable rows={report.rows} selection={selection} onSelect={onSelect} compact={Boolean(sources)} />}
+          {tab === 'receipts' && <ReceiptsTable report={report} kbId={kbId} selection={selection} onSelect={onSelect} />}
+          {tab === 'ledger' && <LedgerTable report={report} />}
+        </div>
+        {pane && (isLarge
+          ? <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-7rem)]">{pane}</div>
+          // Portal: the sidebar rail is a z-30 sticky element in the root stacking context, which the report's own context cannot climb above.
+          : createPortal(<div className="fixed inset-0 z-50 bg-background/95 p-3">{pane}</div>, document.body))}
+      </div>
     </div>
   );
 }

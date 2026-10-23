@@ -285,12 +285,15 @@ Props:
   onPageInView?: (page: number) => void }
 ```
 
-- Every page renders as a `div` with `data-page`, a 10px muted page number above it (DocAI style), and an `<img>`
-  `loading="lazy" decoding="async"` with `rounded-sm bg-white shadow-lg ring-1 ring-black/5`. Width is
-  `zoom%` of the scroller's width (`w-max min-w-full` column so a zoomed page scrolls both ways). Until an image
-  has loaded, the page div reserves height from a 1 : 1.414 aspect so scroll offsets are right; the measured
-  aspect replaces it on load. `content-visibility: auto` with `contain-intrinsic-size` on every page except the
-  cited one, which stays `visible` so its `<img>` loads off-screen.
+- Every page renders as an outer `div` with `data-page`, explicit width and height, the paper look
+  (`rounded-sm bg-white shadow-lg ring-1 ring-black/5`) and a 10px muted page number above it (DocAI style), and an
+  inner absolute child that carries `content-visibility: auto` (the cited page stays `visible` so its `<img>` loads
+  off-screen) and holds the `<img>` `loading="lazy" decoding="async"` and the boxes. Containment sits on the inner
+  element because paint containment clips overflow, which would hide the label and the shadow. Width is `zoom%` of
+  the scroller's measured content width (`w-max min-w-full` column so a zoomed page scrolls both ways); pages render
+  only once that width is measured. Until an image has loaded, the page reserves height from a 1 : 1.414 aspect so
+  scroll offsets are right; the measured aspect replaces it on load. Per-image state (aspect, failure) is keyed by
+  image URL, so switching the stack between the statement file and the receipts file never reuses stale state.
 - Boxes are absolutely positioned inside the page div using `boxStyle(box)`:
   `{ left: x0/10 %, top: y0/10 %, width: (x1-x0)/10 %, height: (y1-y0)/10 % }`. The primary box is
   `ring-2 ring-primary bg-primary/10 rounded-sm`; secondary boxes are `ring-1 ring-primary/50 bg-primary/5`. Each

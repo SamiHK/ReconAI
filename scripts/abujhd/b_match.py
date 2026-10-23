@@ -70,21 +70,34 @@ GENERIC = {_fold(t) for t in ("total", "invoice", "tax", "amount", "words", "kin
 def real_merchant_tokens(g):
     return norm_merchant(" ".join(_merchants(g))) - GENERIC
 
+def _own_total_line(g):
+    """The piece's own text prints the amount it calls its total: a whole document, not the header or the footer half of one."""
+    return bool({v for v, t in total_flags(g.get("text") or "").items() if t} & receipt_amounts(g))
+
+def _same_invoice(a, b):
+    """Invoice numbers agree when equal, missing, or one is the other with an OCR digit dropped (p80/p81: AYNS/2026/1016 vs 10164)."""
+    a, b = (re.sub(r"\s", "", x or "") for x in (a, b))
+    return a.startswith(b) or b.startswith(a)
+
 def collapse_fragments(records):
     """Same-/adjacent-page pieces of one document (same total, compatible merchant) merge into the earliest record.
-    Each record tracks `_rm`, the real merchant tokens of everything merged into it, so two different shops never share a record (p10: same 10.00).
+    Each record tracks `_rm`, the real merchant tokens of everything merged into it, so two different shops never share a record (p10: same 10.00),
+    `_inv`, the invoice numbers seen, and `_tl`, whether a piece printed its own total line: two numbers or two total lines are two documents
+    (p23/p24: invoices 1634 and 1635, both 10.01; p82/p83: two copies of one receipt), never fragments of one.
     Merchant-less pieces go last (order-independent) and stay unmerged when two different shops would both accept them."""
     out = []
     for i, B in sorted(enumerate(records), key=lambda p: not real_merchant_tokens(p[1])):
-        tb = real_merchant_tokens(B)
+        tb = real_merchant_tokens(B); ib = (B.get("fields") or {}).get("invoice_no"); lb = _own_total_line(B)
         same_day_ok = lambda A: not _dates(A) or not _dates(B) or set(_dates(A)) & set(_dates(B))   # two days = two purchases, never one record
-        ok = [A for A in out if abs(A["page"] - B["page"]) <= 1 and receipt_amounts(A) & receipt_amounts(B) and (not A["_rm"] or not tb or A["_rm"] & tb) and same_day_ok(A)]
+        one_doc = lambda A: all(_same_invoice(x, ib) for x in A["_inv"]) and not (A["_tl"] and lb)
+        ok = [A for A in out if abs(A["page"] - B["page"]) <= 1 and receipt_amounts(A) & receipt_amounts(B) and (not A["_rm"] or not tb or A["_rm"] & tb) and same_day_ok(A) and one_doc(A)]
         if not tb and len({frozenset(A["_rm"]) for A in ok if A["_rm"]}) > 1: ok = []
         if not ok:
-            out.append({**B, "ids": list(B["ids"]), "boxes": list(B["boxes"]), "amounts": [dict(x) for x in B["amounts"]], "dates": list(B["dates"]), "pages": list(B["pages"]), "_rm": set(tb), "_i": i})
+            out.append({**B, "ids": list(B["ids"]), "boxes": list(B["boxes"]), "amounts": [dict(x) for x in B["amounts"]], "dates": list(B["dates"]), "pages": list(B["pages"]),
+                        "_rm": set(tb), "_i": i, "_inv": {ib} - {None}, "_tl": lb})
             continue
         A = ok[0]
-        A["ids"] += B["ids"]; A["boxes"] += B["boxes"]; A["_rm"] |= tb
+        A["ids"] += B["ids"]; A["boxes"] += B["boxes"]; A["_rm"] |= tb; A["_inv"] |= {ib} - {None}; A["_tl"] = A["_tl"] or lb
         A["notes"] = " ".join(filter(None, [A.get("notes"), B.get("notes")])) or None   # a multi-document note on any piece must survive
         for x in B["amounts"]:
             m = next((y for y in A["amounts"] if y["value"] == x["value"]), None)
@@ -94,7 +107,7 @@ def collapse_fragments(records):
         if not (A.get("fields") or {}).get("merchant") and (B.get("fields") or {}).get("merchant"): A["fields"] = B["fields"]
         A["pages"] = sorted(set(A["pages"]) | set(B["pages"]))
     out.sort(key=lambda A: A["_i"])
-    return [{k: v for k, v in A.items() if k not in ("_rm", "_i")} for A in out]
+    return [{k: v for k, v in A.items() if k not in ("_rm", "_i", "_inv", "_tl")} for A in out]
 
 def _date_readings(d, year):
     """ISO dates a scanned date could really mean: as read, the year corrected, day and month swapped, the Arabic digits
@@ -108,6 +121,14 @@ def _date_readings(d, year):
         except ValueError: pass
     return list(dict.fromkeys(out))
 
+def _overlap(g, row):
+    A = norm_merchant(" ".join(_merchants(g))); B = norm_merchant(row["merchant"])
+    return A & B or _prefixes(A) & _prefixes(B)
+
+def _inv_order(g):
+    n = re.sub(r"\D", "", (g.get("fields") or {}).get("invoice_no") or "")
+    return int(n) if n else None
+
 def _amount_diff(g, row):
     return min((round(abs(a - row["amount"]), 2) for a in receipt_amounts(g)), default=99)
 
@@ -119,10 +140,7 @@ def score(g, row):
     ry = int(row["date"][:4])
     ds = [_days(x, row["date"]) for d in _dates(g) for x in _date_readings(d, ry)]
     support = 2 if 0 in ds else 1 if 1 in ds else 0
-    A = norm_merchant(" ".join(_merchants(g)))
-    B = norm_merchant(row["merchant"])
-    overlap = A & B or _prefixes(A) & _prefixes(B)
-    support += min(2, len(overlap))
+    support += min(2, len(_overlap(g, row)))
     return s + support if s == 3 or support else 0  # a 5-halala drift alone is not a candidate: needs date or merchant support
 
 _MULTI_DOC = re.compile(r"more than one|multiple documents|two documents|two receipts|separate receipts", re.I)
@@ -210,11 +228,25 @@ def split_other_month(groups, month, rows=()):
 def _refs(v): return v if isinstance(v, list) else [v] if v else []
 
 def second_pass(groups, rows, links, review, tol=3.0):
-    """Leftovers only: rows nobody linked or listed for review, groups with no link and no review entry. Pass 1 is never touched.
+    """Pass 1's links are never touched; its ties are settled where the evidence allows, then leftovers (rows nobody linked or
+    listed for review, groups with no link and no review entry) get the weaker rules.
+    0) sequential invoices: k review groups of one shop tying over the same k same-day rows of that shop -> paired, invoice-number
+       order = payment order (p23/p24: 1634 and 1635 paid at 13:06 and 13:10).
     1) split payment: two same-day rows with the identical statement merchant string summing exactly to a receipt total -> both linked.
     2) near amount: one row within `tol` SAR on the receipt's date, unique both ways -> linked (assign_statuses shows AMOUNT_MISMATCH).
     3) no total: a healed receipt with merchant+date but no amount and one same-day row whose merchant overlaps -> review suggestion."""
-    links, review = dict(links), dict(review)
+    links, review = dict(links), {k: list(v) for k, v in review.items()}
+    by_ref = {r["ref"]: r for r in rows}
+    def claim(gid, ref):   # link, and take the row(s) out of every other candidate list
+        links[gid] = ref; review.pop(gid, None)
+        for c in review.values(): c[:] = [(r, s) for r, s in c if r not in _refs(ref)]
+    blocks = {}
+    for gid, cands in review.items():
+        if len(cands) > 1 and len({sc for _, sc in cands}) == 1 and cands[0][1] >= 4: blocks.setdefault(frozenset(r for r, _ in cands), []).append(gid)
+    for refs, gids in blocks.items():
+        gs = [next(g for g in groups if g["id"] == gid) for gid in gids]; orders = [_inv_order(g) for g in gs]
+        if len(gs) != len(refs) or None in orders or len(set(orders)) < len(orders) or not all(_overlap(g, by_ref[r]) for g in gs for r in refs): continue
+        for g, ref in zip(sorted(gs, key=_inv_order), sorted(refs, key=lambda r: (by_ref[r]["date"], by_ref[r].get("time") or ""))): claim(g["id"], ref)
     taken = {r for v in links.values() for r in _refs(v)} | {r for c in review.values() for r, _ in c}
     left_rows = [r for r in rows if r["kind"] == "purchase" and r["ref"] not in taken]
     left = [g for g in groups if not links.get(g["id"]) and g["id"] not in review]

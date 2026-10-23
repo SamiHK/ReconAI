@@ -7,8 +7,8 @@ def G(id, page, amounts, dates, merchant, kind="receipt", fields=None, notes=Non
     return {"id": id, "page": page, "pages": [page], "amounts": [{"value": a, "total_candidate": True} for a in amounts],
             "dates": dates, "merchant_candidates": [merchant], "fields": fields, "kind": kind, "notes": notes, "candidates": []}
 
-def R(ref, amount, date, merchant, kind="purchase"):
-    return {"ref": ref, "amount": amount, "date": date, "merchant": merchant, "kind": kind}
+def R(ref, amount, date, merchant, kind="purchase", time="00:00:00"):
+    return {"ref": ref, "amount": amount, "date": date, "time": time, "merchant": merchant, "kind": kind}
 
 ROWS = [R("r1", 41.0, "2026-09-01", "MAZA RESTALAYOUNAL AHSASAU"),
         R("r2", 218.5, "2026-09-02", "AL FARES HOLDING COH alhazmMUBARRASAU"),
@@ -369,6 +369,44 @@ def test_collapse_fragments_keeps_different_days_apart():
     c = G("g3", 6, [11.5], [], "Total Invoice", fields=None)
     c["ids"] = ["g3"]; c["boxes"] = [(6, None)]
     assert [o["ids"] for o in collapse_fragments([a, c])] == [["g1", "g3"]]
+
+def test_collapse_fragments_keeps_distinct_invoices_apart():
+    # p23/p24: one shop, one day, one total, adjacent pages, but each piece carries its own invoice number: two purchases
+    F = lambda inv: {"merchant": "AHMED SALEH AL RAHIMAN SANITARY WARE EST.", "date": "2026-09-07", "total": 10.01, "invoice_no": inv}
+    a = G("g1", 23, [10.01], ["2026-09-07"], "AHMED SALEH AL RAHIMAN SANITARY WARE EST.", kind="invoice", fields=F("1635"))
+    b = G("g2", 24, [10.01], ["2026-09-07"], "AHMED SALEH AL RAHIMAN SANITARY WARE EST.", kind="invoice", fields=F("1634"))
+    for g in (a, b): g["ids"] = [g["id"]]; g["boxes"] = [(g["page"], None)]
+    assert [o["ids"] for o in collapse_fragments([a, b])] == [["g1"], ["g2"]]
+    # the same number with an OCR digit dropped (one a prefix of the other) is still one invoice
+    b2 = {**b, "fields": F("16350")}
+    assert [o["ids"] for o in collapse_fragments([a, b2])] == [["g1", "g2"]]
+    # p82/p83: two copies that each print their own total line are two documents, invoice number or not
+    Fz = {"merchant": "Green Star Fuel", "date": "2026-09-28", "total": 628.0, "invoice_no": "47-11075"}
+    c = G("g3", 82, [628.0], ["2026-09-28"], "Green Star Fuel", kind="receipt", fields=Fz); c["text"] = "Diesel 1.79\n628.00 SAR\nالإجمالي 628.00 SAR"
+    d = G("g4", 83, [628.0], ["2026-09-28"], "Green Star Fuel", kind="invoice", fields=dict(Fz)); d["text"] = c["text"]
+    for g in (c, d): g["ids"] = [g["id"]]; g["boxes"] = [(g["page"], None)]
+    assert [o["ids"] for o in collapse_fragments([c, d])] == [["g3"], ["g4"]]
+    # the footer of an invoice (no merchant, no number, no total line of its own) still folds into its header half
+    e = G("g5", 83, [628.0], [], "Amount in Words :", fields={"merchant": None, "date": None, "total": 628.0, "invoice_no": None}); e["text"] = "Amount in Words : six hundred twenty eight riyals"
+    e["ids"] = ["g5"]; e["boxes"] = [(83, None)]
+    assert [o["ids"] for o in collapse_fragments([c, e])] == [["g3", "g5"]]
+
+def test_sequential_invoices_pair_with_payment_order():
+    # two invoices of one shop numbered 1634 and 1635, two card payments of that shop at 13:06 and 13:10: issued in payment order
+    rows = [R("late", 10.0, "2026-09-07", "AHMED ALRAHIMAN EST", time="13:10:33"), R("early", 10.0, "2026-09-07", "AHMED ALRAHIMAN EST", time="13:06:34")]
+    F = lambda inv: {"merchant": "Ahmed Al Rahiman", "date": "2026-09-07", "total": 10.01, "invoice_no": inv}
+    a, b = _left([G("g1", 23, [10.01], ["2026-09-07"], "Ahmed Al Rahiman", fields=F("1635")), G("g2", 24, [10.01], ["2026-09-07"], "Ahmed Al Rahiman", fields=F("1634"))])
+    links, review = match_receipts([a, b], rows, {})
+    assert links["g1"] is None and links["g2"] is None and set(review) == {"g1", "g2"}          # pass 1: a genuine tie
+    links, review = second_pass([a, b], rows, links, review)
+    assert links == {"g1": "late", "g2": "early"} and not review, (links, review)
+    # three groups over the same two rows, or unnumbered invoices: still a human decision
+    c = _left([G("g3", 25, [10.01], ["2026-09-07"], "Ahmed Al Rahiman", fields=F("1636"))])[0]
+    l3, r3 = match_receipts([a, b, c], rows, {}); l3, r3 = second_pass([a, b, c], rows, l3, r3)
+    assert set(r3) == {"g1", "g2", "g3"} and not any(l3.values()), (l3, r3)
+    u1, u2 = _left([G("u1", 23, [10.01], ["2026-09-07"], "Ahmed Al Rahiman", fields=F(None)), G("u2", 24, [10.01], ["2026-09-07"], "Ahmed Al Rahiman", fields=F(None))])
+    l4, r4 = match_receipts([u1, u2], rows, {}); l4, r4 = second_pass([u1, u2], rows, l4, r4)
+    assert set(r4) == {"u1", "u2"} and not any(l4.values()), (l4, r4)
 
 if __name__ == "__main__":
     for name, fn in list(globals().items()):

@@ -179,17 +179,21 @@ def second_pass(groups, rows, links, review, tol=3.0):
             if len(pairs) == 1:
                 a, b = pairs[0]; links[g["id"]] = [a["ref"], b["ref"]]; left_rows = [r for r in left_rows if r not in (a, b)]; break
     left = [g for g in left if not links.get(g["id"])]
-    near = lambda g, r: same_day(g, r) and _amount_diff(g, r) <= tol
+    real = lambda s: norm_merchant(s) - GENERIC - {"اسواق"}   # "markets" is generic here: the ASDAF alias maps to it
+    close = lambda g, r: same_day(g, r) and _amount_diff(g, r) <= tol   # ambiguity is judged on this alone, support or not
+    def near(g, r):   # a candidate link: close, within 10% of the row, and the merchant overlaps or the healer was confident
+        if not (close(g, r) and _amount_diff(g, r) <= 0.10 * r["amount"]): return False
+        A, B = real_merchant_tokens(g), real(r["merchant"])
+        return bool(A & B or _prefixes(A) & _prefixes(B) or (g.get("confidence") or 0) >= 0.7)
     all_rows = [r for r in rows if r["kind"] == "purchase"]
     for g in left:   # unique both ways against EVERY same-day row/group, not only leftovers: a taken near-twin means ambiguity
         c = [r for r in left_rows if near(g, r)]
-        if len(c) == 1 and sum(near(g, r) for r in all_rows) == 1 and sum(near(h, c[0]) for h in groups) == 1:
+        if len(c) == 1 and sum(close(g, r) for r in all_rows) == 1 and sum(close(h, c[0]) for h in groups) == 1:
             links[g["id"]] = c[0]["ref"]; left_rows.remove(c[0])
     left = [g for g in left if not links.get(g["id"])]
     for g in left:
         f = g.get("fields") or {}
         if receipt_amounts(g) or not (f.get("merchant") and f.get("date")): continue
-        real = lambda s: norm_merchant(s) - GENERIC - {"اسواق"}   # "markets" is generic here: the ASDAF alias maps to it
         toks = real(f["merchant"])
         c = [r for r in left_rows if r["date"] == f["date"] and (toks & real(r["merchant"]) or _prefixes(toks) & _prefixes(real(r["merchant"])))]
         if len(c) == 1: review[g["id"]] = [(c[0]["ref"], 0)]; left_rows.remove(c[0])
@@ -263,7 +267,7 @@ def assign_statuses(statement, groups, links, review, tieout, ledger):
         elif row["receipt_ids"]:
             g = next(g for g in groups if g["id"] == row["receipt_ids"][0])
             diff = _amount_diff(g, r)
-            row["status"] = "AMOUNT_MISMATCH" if diff > 0.05 else "MATCHED"; row["reason"] = f"receipt {row['receipt_ids'][0]} p{g['page']}" + (f" (total differs by {diff:.2f})" if 0 < diff <= 0.05 else "")
+            row["status"] = "AMOUNT_MISMATCH" if diff > 0.05 else "MATCHED"; row["reason"] = f"receipt {row['receipt_ids'][0]} p{g['page']}" + (f" (total differs by {diff:.2f})" if diff > 0 else "")
         elif r["ref"] in review_refs:
             row["status"] = "REVIEW"; row["reason"] = "candidate receipts need a human pick"
         else:

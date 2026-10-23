@@ -223,7 +223,7 @@ def test_second_pass_split_payment():
 
 def test_second_pass_amount_tolerance():
     rows = [R("a", 172.0, "2026-09-09", "ALMAQHAWI IND"), R("b", 500.0, "2026-09-09", "X")]
-    g = _left([G("g1", 1, [172.5], ["2026-09-09"], "Ibrahim Al-Mughawi")])[0]
+    g = _left([G("g1", 1, [172.5], ["2026-09-09"], "Ibrahim Al-Mughawi")])[0]; g["confidence"] = 0.9   # no merchant overlap: the healer's confidence carries it
     links, _ = second_pass([g], rows, {"g1": None}, {})
     assert links["g1"] == "a", links                  # same day, 0.50 apart, unique both ways
     rows2, _ = assign_statuses(rows, [g], links, {}, tie_out_ledger(rows, []), [])
@@ -239,6 +239,23 @@ def test_second_pass_amount_tolerance():
     rows3 = [R("a", 172.0, "2026-09-09", "Y"), R("z", 171.5, "2026-09-09", "Z")]
     assert second_pass([g], rows3, {"g1": None, "gz": "z"}, {})[0]["g1"] is None
     assert second_pass([g], rows3, {"g1": None}, {"gq": [("z", 3)]})[0]["g1"] is None
+
+def test_second_pass_near_amount_guard():
+    day = "2026-09-08"
+    weak = _left([G("g1", 1, [37.99], [day], "Othaim")])[0]; weak["confidence"] = 0.42
+    assert second_pass([weak], [R("a", 40.0, day, "AJMY COMPANY")], {"g1": None}, {})[0]["g1"] is None   # no merchant overlap, low confidence
+    assert second_pass([weak], [R("a", 40.0, day, "AL OTHAIM MARKETS")], {"g1": None}, {})[0]["g1"] == "a"   # merchant overlap carries it
+    sure = _left([G("g2", 2, [30.0], [day], "Nobody Alike")])[0]; sure["confidence"] = 0.95
+    rows = [R("a", 31.5, day, "ZZZ")]
+    links, _ = second_pass([sure], rows, {"g2": None}, {})
+    assert links["g2"] == "a", links                  # confident healer: 1.50 <= min(3.00, 10% of 31.50)
+    rows2, _ = assign_statuses(rows, [sure], links, {}, tie_out_ledger(rows, []), [])
+    assert "differs by 1.50" in rows2[0]["reason"] and rows2[0]["status"] == "AMOUNT_MISMATCH", rows2[0]
+    rows3 = [R("c", 32.5, day, "ZZZ")]
+    l3, _ = second_pass([sure], rows3, {"g2": None}, {})
+    assert "differs by 2.50" in assign_statuses(rows3, [sure], l3, {}, tie_out_ledger(rows3, []), [])[0][0]["reason"]
+    small = _left([G("g3", 3, [7.5], [day], "Nobody Alike")])[0]; small["confidence"] = 0.95
+    assert second_pass([small], [R("b", 5.0, day, "ZZZ")], {"g3": None}, {})[0]["g3"] is None   # 2.50 > 10% of 5.00
 
 def test_second_pass_no_total_to_review():
     rows = [R("a", 93.0, "2026-09-08", "AL OTHAIM MARKETS COMPANY"), R("b", 6.0, "2026-09-08", "ASDAF")]

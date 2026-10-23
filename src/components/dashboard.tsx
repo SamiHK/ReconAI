@@ -58,7 +58,7 @@ export function Dashboard() {
       {/* Sidebar — sticky full-height rail on the LEFT: logo + vertical
           tabs persist while scrolling. */}
       <aside className="sticky top-0 z-30 flex h-screen w-16 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:w-60">
-        <div className="flex flex-col gap-1 px-3 pt-6 pb-2 md:px-4">
+        <div className="hidden md:flex flex-col gap-1 px-3 pt-6 pb-2 md:px-4">
           <BrandLogo className="hidden md:block" />
           <span className="hidden text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:inline">ReconAI</span>
         </div>
@@ -94,7 +94,7 @@ export function Dashboard() {
               render={
                 <Button
                   variant="ghost"
-                  className="w-full justify-start gap-2 rounded-none px-3 pt-7 pb-6"
+                  className="w-full justify-start gap-2 rounded-md px-2 py-2"
                   aria-label="Account menu"
                   title="Account"
                 />

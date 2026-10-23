@@ -1,8 +1,7 @@
 # scripts/abujhd/c_report.py
 """Step C: the whiteboard report. One statement row per line with three citations; analytics on top; sections for everything a person must settle.
 
-Visual system follows providus.io (tokens measured 2026-10-23): light #F2F2F2 page, white cards, ink #151515,
-blue #2F6DB2, deep-navy header #02091F, Archivo display + Geist body, 12px radius, pill chips. Status colours are
+Visual system follows DocAI (2026-10-23): light #F5F5F5 page, white cards, ink #151515, purple #554BC5 primary and #4239A9 deep, DM Sans + Geist Mono, 10px radius, 6px chips. Status colours are
 reserved and always paired with a glyph and a word. Charts are inline SVG built here, no libraries.
 """
 import argparse, html, sys, pathlib, re

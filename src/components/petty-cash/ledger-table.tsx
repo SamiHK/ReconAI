@@ -9,7 +9,12 @@ import { FilterChip, StatusChip } from './chips';
 export function LedgerLines({ lines, highlightCode }: { lines: LedgerLine[]; highlightCode?: string }) {
   const firstHit = useRef<HTMLTableRowElement>(null);
   useEffect(() => {
-    firstHit.current?.scrollIntoView({ block: 'center' });
+    const row = firstHit.current;
+    // Scroll only the nearest scroll container (the pane body), never the document: scrollIntoView would move the page too.
+    const scroller = row?.closest<HTMLElement>('[data-scroll-container]');
+    if (!row || !scroller) return;
+    const delta = row.getBoundingClientRect().top - scroller.getBoundingClientRect().top - scroller.clientHeight / 2 + row.offsetHeight / 2;
+    scroller.scrollTop += delta;
   }, [highlightCode]);
   const firstHitIdx = highlightCode === undefined ? -1 : lines.findIndex(l => l.code === highlightCode);
   return (
@@ -35,7 +40,7 @@ export function LedgerLines({ lines, highlightCode }: { lines: LedgerLine[]; hig
             const hit = highlightCode !== undefined && l.code === highlightCode;
             const ref = i === firstHitIdx ? firstHit : undefined;
             return (
-              <TableRow key={`${l.row}-${l.code}`} ref={ref} className={cn(hit && 'bg-primary/10 hover:bg-primary/10')}>
+              <TableRow key={`${l.row}-${l.code}`} ref={ref} aria-current={hit ? 'true' : undefined} className={cn(hit && 'bg-primary/10 hover:bg-primary/10')}>
                 <TableCell className="whitespace-nowrap font-mono text-xs">{l.code}</TableCell>
                 <TableCell className="whitespace-nowrap font-mono text-xs">{l.date}</TableCell>
                 <TableCell className="text-right font-mono text-xs tabular-nums">{money(l.debit)}</TableCell>

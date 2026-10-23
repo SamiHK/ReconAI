@@ -1,5 +1,6 @@
 'use client';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { createPortal } from 'react-dom';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -27,6 +28,20 @@ function Tile({ label, value, sub }: { label: string; value: string; sub: string
   );
 }
 
+const LG = '(min-width: 1024px)';
+/** True at Tailwind's lg breakpoint and up (server render assumes large). */
+function useIsLarge(): boolean {
+  return useSyncExternalStore(
+    onChange => {
+      const m = window.matchMedia(LG);
+      m.addEventListener('change', onChange);
+      return () => m.removeEventListener('change', onChange);
+    },
+    () => window.matchMedia(LG).matches,
+    () => true
+  );
+}
+
 /** The petty-cash report for one workspace: KPI tiles, three tabbed tables and the docked citation pane. */
 export function PettyCashReport({ kbId, version }: { kbId: string; version: number }) {
   const [state, setState] = useState<{ report: PettyReport | null; error: string | null }>({ report: null, error: null });
@@ -43,7 +58,9 @@ export function PettyCashReport({ kbId, version }: { kbId: string; version: numb
         return (await r.json()) as PettyReport;
       })
       .then(report => {
-        if (!cancelled) setState({ report, error: null });
+        if (cancelled) return;
+        setState({ report, error: null });
+        setSelection(s => (s && paneSources(report, s) ? s : null));
       })
       .catch((e: unknown) => {
         if (!cancelled) setState({ report: null, error: e instanceof Error ? e.message : 'Failed to load' });
@@ -55,6 +72,7 @@ export function PettyCashReport({ kbId, version }: { kbId: string; version: numb
 
   const closePane = useCallback(() => setSelection(null), []);
   const onSelect = useCallback((s: Selection) => setSelection(s), []);
+  const isLarge = useIsLarge();
 
   if (state.error) {
     return (
@@ -85,9 +103,12 @@ export function PettyCashReport({ kbId, version }: { kbId: string; version: numb
   const selectionKey = selection ? JSON.stringify(selection) : '';
   const k = report.kpis;
   const built = new Date(report.meta.built_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  const pane = sources && selection
+    ? <CitationPane key={selectionKey} report={report} kbId={kbId} sources={sources} initialSource={selection.source} onClose={closePane} />
+    : null;
 
   return (
-    <div className={cn('gap-4', sources && 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(420px,45%)]')}>
+    <div className={cn('gap-4', sources && isLarge && 'lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(420px,45%)]')}>
       <div className="min-w-0 space-y-4">
         <header>
           <h3 className="text-h3">{report.meta.client} · {report.meta.month_label}</h3>
@@ -116,15 +137,14 @@ export function PettyCashReport({ kbId, version }: { kbId: string; version: numb
             </button>
           ))}
         </div>
-        {tab === 'transactions' && <TransactionsTable rows={report.rows} selection={selection} onSelect={onSelect} />}
+        {tab === 'transactions' && <TransactionsTable rows={report.rows} selection={selection} onSelect={onSelect} compact={Boolean(sources)} />}
         {tab === 'receipts' && <ReceiptsTable report={report} kbId={kbId} selection={selection} onSelect={onSelect} />}
         {tab === 'ledger' && <LedgerTable report={report} />}
       </div>
-      {sources && selection && (
-        <div className="fixed inset-0 z-50 bg-background/95 p-3 lg:sticky lg:inset-auto lg:top-4 lg:z-auto lg:h-[calc(100vh-7rem)] lg:bg-transparent lg:p-0">
-          <CitationPane key={selectionKey} report={report} kbId={kbId} sources={sources} initialSource={selection.source} onClose={closePane} />
-        </div>
-      )}
+      {pane && (isLarge
+        ? <div className="lg:sticky lg:top-4 lg:h-[calc(100vh-7rem)]">{pane}</div>
+        // Portal: the sidebar rail is a z-30 sticky element in the root stacking context, which the report's own context cannot climb above.
+        : createPortal(<div className="fixed inset-0 z-50 bg-background/95 p-3">{pane}</div>, document.body))}
     </div>
   );
 }

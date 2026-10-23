@@ -101,7 +101,7 @@ const STATUS: Record<string, { word: string; glyph: string; tone: Tone }> = {
   NO_CARD_TXN: { word: 'No card transaction', glyph: '!', tone: 'warn' },
 };
 export function statusMeta(status: string | null): { word: string; glyph: string; tone: Tone } {
-  return (status && STATUS[status]) || { word: status ?? '—', glyph: '·', tone: 'muted' };
+  return (status && Object.hasOwn(STATUS, status) && STATUS[status]) || { word: status ?? '—', glyph: '·', tone: 'muted' };
 }
 
 // ---------- filters, counts, sort ----------

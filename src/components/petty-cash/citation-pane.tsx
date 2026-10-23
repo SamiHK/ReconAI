@@ -32,6 +32,7 @@ export function CitationPane({ report, kbId, sources, initialSource, onClose }: 
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (e.defaultPrevented) return;
       if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
@@ -71,7 +72,7 @@ export function CitationPane({ report, kbId, sources, initialSource, onClose }: 
             <Button variant="ghost" size="icon-sm" title="Zoom in" aria-label="Zoom in" disabled={zoom >= ZOOM_MAX} onClick={() => setZoom(z => Math.min(ZOOM_MAX, z + ZOOM_STEP))}>
               <ZoomIn className="size-4" />
             </Button>
-            <Button variant="ghost" size="icon-sm" title="Jump to citation" aria-label="Jump to citation" onClick={() => setJump(j => j + 1)}>
+            <Button variant="ghost" size="icon-sm" title="Jump to citation" aria-label="Jump to citation" disabled={boxes.length === 0} onClick={() => setJump(j => j + 1)}>
               <LocateFixed className="size-4" />
             </Button>
           </div>
@@ -90,6 +91,7 @@ export function CitationPane({ report, kbId, sources, initialSource, onClose }: 
               aria-selected={source === t.key}
               disabled={!available[t.key]}
               onClick={() => {
+                if (t.key === source) return;
                 setSource(t.key);
                 setPageInView(null); // the indicator belongs to the file being shown; a fresh stack reports its own page
               }}
@@ -113,7 +115,7 @@ export function CitationPane({ report, kbId, sources, initialSource, onClose }: 
           // Keyed by source: the statement file and the receipts file each get their own stack (fresh scroll, fresh image nodes).
           <PageStack key={source} images={images} boxes={boxes} activeIndex={activeIndex} jumpSignal={jump} zoom={zoom} onPageInView={setPageInView} />
         ) : ledger ? (
-          <div className="h-full space-y-2 overflow-auto p-3">
+          <div data-scroll-container className="h-full space-y-2 overflow-auto p-3">
             <p className="text-xs text-muted-foreground">
               {ledger.cell} · {ledger.code} · {money(ledger.amount)} ·{' '}
               {ledger.relation === 'rolled-up'

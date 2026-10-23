@@ -89,7 +89,7 @@ export function ReceiptsTable({ report, kbId, selection, onSelect }: { report: P
                   >
                     {g.crop && (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={imageUrl(kbId, g.crop)} alt="" className="h-10 w-auto max-w-16 rounded border border-border bg-white object-cover object-top" />
+                      <img src={imageUrl(kbId, g.crop)} alt="" loading="lazy" className="h-10 w-auto max-w-16 rounded border border-border bg-white object-cover object-top" />
                     )}
                     <span className="font-mono text-xs">p{g.page} · {g.id}</span>
                   </button>

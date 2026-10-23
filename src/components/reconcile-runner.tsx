@@ -277,7 +277,7 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
   const [showPettyCash, setShowPettyCash] = useState(false);
   const [pettyRun, setPettyRun] = useState<{ busy: boolean; note: string | null; error: string | null; version: number }>({ busy: false, note: null, error: null, version: 0 });
 
-  // Re-run the matcher and report on the server, then reload the pane (the ?v= query busts the iframe's cached document).
+  // Re-run the matcher and report on the server, then reload the pane (a new version makes the report re-fetch report.json).
   const runPettyCash = async () => {
     setPettyRun(s => ({ ...s, busy: true, note: null, error: null }));
     try {

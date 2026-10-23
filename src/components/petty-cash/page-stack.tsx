@@ -68,7 +68,10 @@ export function PageStack({ images, boxes, activeIndex, jumpSignal, zoom, onPage
   // A frame still pending at unmount would find no scroller; cancel it anyway.
   useEffect(
     () => () => {
-      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
     },
     []
   );

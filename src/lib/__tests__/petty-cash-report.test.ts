@@ -62,6 +62,7 @@ describe('statusMeta', () => {
   });
   test('falls back to the raw status, and an em dash for null', () => {
     expect(statusMeta('WEIRD')).toEqual({ word: 'WEIRD', glyph: '·', tone: 'muted' });
+    expect(statusMeta('constructor')).toEqual({ word: 'constructor', glyph: '·', tone: 'muted' });
     expect(statusMeta(null)).toEqual({ word: '—', glyph: '·', tone: 'muted' });
   });
 });

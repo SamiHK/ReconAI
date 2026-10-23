@@ -9,7 +9,8 @@ import {
 } from '@/lib/petty-cash-report';
 import { CitationChip, FilterChip, StatusChip } from './chips';
 
-export function TransactionsTable({ rows, selection, onSelect }: { rows: StatementRow[]; selection: Selection | null; onSelect: (s: Selection) => void }) {
+/** `compact` drops the Note column so the table fits beside the docked pane. */
+export function TransactionsTable({ rows, selection, onSelect, compact = false }: { rows: StatementRow[]; selection: Selection | null; onSelect: (s: Selection) => void; compact?: boolean }) {
   const [status, setStatus] = useState('ALL');
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<{ key: SortKey; dir: 'asc' | 'desc' }>({ key: 'date', dir: 'asc' });
@@ -43,20 +44,20 @@ export function TransactionsTable({ rows, selection, onSelect }: { rows: Stateme
             <TableRow>
               <TableHead className={TABLE_HEAD_BAND}>Status</TableHead>
               <TableHead className={TABLE_HEAD_BAND} aria-sort={ariaSort('date')}>
-                <button type="button" onClick={() => toggleSort('date')} className="uppercase">Date{sortMark('date')}</button>
+                <button type="button" onClick={() => toggleSort('date')}>Date<span aria-hidden="true">{sortMark('date')}</span></button>
               </TableHead>
               <TableHead className={cn(TABLE_HEAD_BAND, 'text-right')} aria-sort={ariaSort('amount')}>
-                <button type="button" onClick={() => toggleSort('amount')} className="uppercase">Amount{sortMark('amount')}</button>
+                <button type="button" onClick={() => toggleSort('amount')}>Amount<span aria-hidden="true">{sortMark('amount')}</span></button>
               </TableHead>
               <TableHead className={TABLE_HEAD_BAND}>Merchant</TableHead>
               <TableHead className={TABLE_HEAD_BAND}>Evidence</TableHead>
-              <TableHead className={TABLE_HEAD_BAND}>Note</TableHead>
+              {!compact && <TableHead className={TABLE_HEAD_BAND}>Note</TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
             {visible.length === 0 && (
               <TableRow>
-                <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">No rows match</TableCell>
+                <TableCell colSpan={compact ? 5 : 6} className="py-6 text-center text-muted-foreground">No rows match</TableCell>
               </TableRow>
             )}
             {visible.map(r => (
@@ -90,7 +91,7 @@ export function TransactionsTable({ rows, selection, onSelect }: { rows: Stateme
                     )}
                   </div>
                 </TableCell>
-                <TableCell className="max-w-[280px] text-xs text-muted-foreground">{r.reason}</TableCell>
+                {!compact && <TableCell className="max-w-[280px] text-xs text-muted-foreground">{r.reason}</TableCell>}
               </TableRow>
             ))}
           </TableBody>

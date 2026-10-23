@@ -255,6 +255,20 @@ def mark_duplicates(groups):
         (dups if first else keep).append({**g, "duplicate_of": first["id"]} if first else g)
     return keep, dups
 
+_TIME = re.compile(r"\b(\d{1,2}):(\d{2})(?::\d{2})?\s*(?:(AM|PM|ص|م)\b)?", re.I)
+
+def _minutes(t):
+    """Minutes since midnight of the first clock time in a string (13:03:54, 2:21 PM, 09:29 ص), else None."""
+    m = _TIME.search(t or "")
+    if not m or int(m[1]) > 23 or int(m[2]) > 59: return None
+    h, ap = int(m[1]), (m[3] or "").upper()
+    h += 12 if ap in ("PM", "م") and h < 12 else -12 if ap in ("AM", "ص") and h == 12 else 0
+    return h * 60 + int(m[2])
+
+def _receipt_minutes(g):
+    f = g.get("fields") or {}
+    return _minutes(f["time"]) if f.get("time") else _minutes(g.get("text"))
+
 def _same_day(g, r):
     """The row's day under some plausible reading of a receipt date: the year off (p10-g2: 2025 for 2026), day/month swapped, ٣ for ٩."""
     return any(x == r["date"] for d in _dates(g) for x in _date_readings(d, int(r["date"][:4])))
@@ -269,8 +283,10 @@ def second_pass(groups, rows, links, review, tol=3.0):
     1a) bundle: same-merchant rows paid within one minute whose sum is the sum of the unlinked same-day receipts (not slips) on one run of
        consecutive pages -> every receipt of the run linked to all of them (p42-44: 115 + 34.50 + 57.50 paid as 202 + 5).
     1b) elimination: a review group whose candidate list the claims above shrank to one row of score >= 4 that nobody else lists -> linked.
-    2) near amount: one row within `tol` SAR on the receipt's date, unique both ways -> linked (assign_statuses shows AMOUNT_MISMATCH);
-       a taken near-twin means ambiguity unless the one leftover candidate is also the only twin that names the shop (p59: 24.15 vs 24.00 and a 25.00 of another shop).
+    2) near amount: one row within `tol` SAR on the receipt's date, unique both ways, and the receipt names the shop, was printed within
+       two minutes of the card charge (p12-g2: 48.00 at 2:21 PM, card 45.00 at 14:21) or the healer was confident -> linked
+       (assign_statuses shows AMOUNT_MISMATCH); a taken near-twin means ambiguity unless the one leftover candidate is also the only
+       twin that names the shop (p59: 24.15 vs 24.00 and a 25.00 of another shop).
     3) no total: a healed receipt with merchant+date but no amount and one same-day row whose merchant overlaps -> review suggestion."""
     links, review = dict(links), {k: list(v) for k, v in review.items()}
     by_ref = {r["ref"]: r for r in rows}; by_id = {g["id"]: g for g in groups}; n0 = {gid: len(c) for gid, c in review.items()}
@@ -320,8 +336,11 @@ def second_pass(groups, rows, links, review, tol=3.0):
     def names(g, r):   # the receipt names the row's shop
         A, B = real_merchant_tokens(g), real(r["merchant"])
         return bool(A & B or _prefixes(A) & _prefixes(B))
-    def near(g, r):   # a candidate link: close, within 10% of the row, and the merchant overlaps or the healer was confident
-        return close(g, r) and _amount_diff(g, r) <= 0.10 * r["amount"] and (names(g, r) or (g.get("confidence") or 0) >= 0.7)
+    def same_minute(g, r):   # printed when the card was charged
+        a, b = _receipt_minutes(g), _minutes(r.get("time"))
+        return a is not None and b is not None and abs(a - b) <= 2
+    def near(g, r):   # a candidate link: close, within 10% of the row, and the merchant overlaps, the clock agrees or the healer was confident
+        return close(g, r) and _amount_diff(g, r) <= 0.10 * r["amount"] and (names(g, r) or same_minute(g, r) or (g.get("confidence") or 0) >= 0.7)
     all_rows = [r for r in rows if r["kind"] == "purchase"]
     for g in left:   # unique both ways against EVERY same-day row/group, not only leftovers: a taken near-twin means ambiguity
         c = [r for r in left_rows if close(g, r) and _amount_diff(g, r) <= 0.10 * r["amount"]]

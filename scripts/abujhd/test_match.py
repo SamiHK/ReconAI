@@ -525,6 +525,25 @@ def test_duplicate_copies_are_marked_and_the_first_copy_links():
                     G("c2", 6, [10.0], ["2026-09-06"], "Shop", fields={"merchant": "Shop", "date": "2026-09-06", "total": 10.0, "invoice_no": None})])
     assert mark_duplicates([c1, c2])[1] == [] and mark_duplicates([a, o])[1] == []
 
+def test_same_minute_receipt_links_within_three_sar_without_a_name():
+    # p12-g2: Shawaya receipt 48.00 at 2:21 PM marked cash (unhealed; OCR date 2026/04/09 for 04/09), card 04/09 14:21 45.00
+    row = R("r", 45.0, "2026-09-04", "shooyat althyafaalamDAMMAMSAU", time="14:21:12")
+    g = _left([G("g", 12, [48.0], ["2026-04-09"], "مدعى مراجعة الـ افة")])[0]
+    g["text"] = "مدعى مراجعة الـ افة\nرقم الضريبة : 310676595200003\n2026/04/09 2:21 PM\nCash كاش:\nالمبلغ المدفوع: 48.00"
+    links, review = second_pass([g], [row], {"g": None}, {})
+    assert links["g"] == "r" and not review, (links, review)
+    rows2, _ = assign_statuses([row], [g], links, review, tie_out_ledger([row], []), [])
+    assert rows2[0]["status"] == "AMOUNT_MISMATCH" and "differs by 3.00" in rows2[0]["reason"], rows2[0]
+    # ten minutes apart: back to a suggestion for a human
+    late = {**g, "text": g["text"].replace("2:21 PM", "2:31 PM")}
+    links, review = second_pass([late], [row], {"g": None}, {})
+    assert links["g"] is None and review["g"] == [("r", 0)], (links, review)
+    # a healer time wins over the text; an Arabic evening marker is PM, a following Arabic word is not
+    h = _left([G("h", 12, [48.0], ["2026-09-04"], "zzz", fields={"merchant": "zzz", "date": "2026-09-04", "time": "02:22 م", "total": 48.0})])[0]; h["text"] = "09:00 مبيعات"
+    assert second_pass([h], [row], {"h": None}, {})[0]["h"] == "r"
+    h["fields"]["time"] = None
+    assert second_pass([h], [row], {"h": None}, {})[0]["h"] is None
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

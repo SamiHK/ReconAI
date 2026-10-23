@@ -172,6 +172,8 @@ def test_strong_total_keyword_beats_amount():
     assert [a["value"] for a in f["amounts"] if a["total_candidate"]] == []
     from common import total_flags
     assert total_flags("Net 5.00 x 9.99") == {5.0: True, 9.99: False}
+    assert total_flags("Internet 5.00 Amount 9.99") == {5.0: False, 9.99: True}   # "net" inside a word is not a total keyword
+    assert total_flags("Net 5.00") == {5.0: True}
     assert total_flags("Subtotal 5.00 Total 9.99") == {5.0: False, 9.99: True}
     assert total_flags("قبل الضريبة 560.87 الإجمالي 645.00") == {560.87: False, 645.0: True}   # window stops at the previous amount
 

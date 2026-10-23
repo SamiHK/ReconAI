@@ -77,7 +77,7 @@ def find_amounts(text):
     return [float(m.replace(",", "")) for m in _AMT.findall(ascii_digits(text or ""))]
 
 
-_TOTAL_STRONG = re.compile(r"(total|net|grand|الإجمالي|إجمالي|الصافي|المجموع)", re.I)
+_TOTAL_STRONG = re.compile(r"(total|\bnet\b|grand|الإجمالي|إجمالي|الصافي|المجموع)", re.I)
 _TOTAL_WEAK = re.compile(r"(purchase amount|amount|المبلغ|مبلغ الشراء)", re.I)
 _NOT_TOTAL = re.compile(r"(قبل الضريبة|before (vat|tax)|excl|sub ?total|without (vat|tax))", re.I)
 def total_flags(text):

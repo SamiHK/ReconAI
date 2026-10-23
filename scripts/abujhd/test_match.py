@@ -582,6 +582,28 @@ def test_unpriced_dated_piece_of_a_single_receipt_page_dates_its_record():
     two = G("two", 87, [50.0], [], "Other Shop", fields={"merchant": "Other Shop", "date": None, "total": 50.0}); two["ids"] = ["two"]; two["boxes"] = [(87, None)]
     assert len(collapse_fragments([day, tot, two])) == 3
 
+from b_match import apply_group_overrides
+
+def test_group_overrides_apply_without_a_healer_run():
+    # overrides.json's groups section used to land only through Step A (a full, paid heal); the matcher applies it to the cached groups too
+    import io, contextlib
+    g = G("p55-g2", 55, [29.97], ["2026-03-16"], "قانونة ضريبية مبسطة،")        # never healed: garbage merchant, misread date
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err):
+        apply_group_overrides([g, G("x", 1, [5.0], [], "x")], {"groups": {"p55-g2": {"total": 29.97, "date": "2026-09-19", "merchant": "Othaim"}, "nope": {"total": 1.0}}})
+    assert g["fields"]["total"] == 29.97 and g["dates"][0] == "2026-09-19" and g["merchant_candidates"][0] == "Othaim" and "[override]" in g["notes"], g
+    assert receipt_amounts(g) == {29.97} and "2026-03-16" in g["dates"] and "unknown group id nope" in err.getvalue()
+    row = R("r", 29.97, "2026-09-19", "AL OTHAIM MARKETS COMPANY", time="10:57:14")
+    assert score(g, row) == 3 + 2 + 1
+    # a non-numeric amount is ignored with a warning, like Step A; applying twice marks the note once
+    err = io.StringIO()
+    with contextlib.redirect_stderr(err): apply_group_overrides([g], {"groups": {"p55-g2": {"total": "29.97"}}})
+    assert g["fields"]["total"] == 29.97 and "not a number" in err.getvalue() and g["notes"].count("[override]") == 1, (g["notes"], err.getvalue())
+    # p26-g1: a healed header with no total gains one, and the amounts list carries it as the total candidate
+    h = G("p26-g1", 26, [], ["2026-09-08"], "Othaim", fields={"merchant": "شركة أسواق العثيم / Othaim", "date": "2026-09-08", "total": None, "card_slip_amount": None})
+    apply_group_overrides([h], {"groups": {"p26-g1": {"total": 93.0, "card_slip_amount": 93.0}}})
+    assert receipt_amounts(h) == {93.0} and h["amounts"] == [{"value": 93.0, "total_candidate": True}] and h["fields"]["merchant"] == "شركة أسواق العثيم / Othaim"
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

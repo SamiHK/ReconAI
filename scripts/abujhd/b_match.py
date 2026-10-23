@@ -55,6 +55,29 @@ def _slip_row_amounts(s, rows):
     refs = set(re.findall(r"\b\d{12}\b", s.get("text") or ""))
     return {round(r["amount"], 2) for r in rows if r["ref"] in refs and r.get("kind", "purchase") == "purchase"}
 
+def apply_group_overrides(groups, overrides):
+    """overrides.json's groups section (a human's total/date/merchant for a group) the way Step A applies it, so a fix lands on the cached
+    groups without a healer run: the fix wins over the healed fields, its amounts become the total candidates, its date and merchant go first."""
+    by_id = {g["id"]: g for g in groups}
+    for gid, fix in ((overrides or {}).get("groups") or {}).items():
+        g = by_id.get(gid)
+        if not g: print(f"override: unknown group id {gid}", file=sys.stderr); continue
+        fix = dict(fix)
+        for k in ("total", "card_slip_amount"):
+            if k in fix and not (isinstance(fix[k], (int, float)) and not isinstance(fix[k], bool)):
+                print(f"override: {gid}.{k}={fix[k]!r} is not a number, ignored", file=sys.stderr); del fix[k]
+        f = {**(g.get("fields") or {}), **fix}; g["fields"] = f
+        if fix.get("kind"): g["kind"] = fix["kind"]
+        totals = [round(f[k], 2) for k in ("total", "card_slip_amount") if isinstance(f.get(k), (int, float))]
+        for v in totals:
+            if all(a["value"] != v for a in g["amounts"]): g["amounts"].append({"value": v, "total_candidate": True})
+        if totals:
+            for a in g["amounts"]: a["total_candidate"] = a["value"] in totals
+        if f.get("date"): g["dates"] = [f["date"]] + [d for d in g["dates"] if d != f["date"]]
+        if f.get("merchant"): g["merchant_candidates"] = [f["merchant"]] + [m for m in g["merchant_candidates"] if m != f["merchant"]]
+        if "[override]" not in (g.get("notes") or ""): g["notes"] = ((g.get("notes") or "") + " [override]").strip()
+    return groups
+
 def collapse_card_slips(groups, rows=()):
     """A card slip joins a same-amount receipt/invoice on the same or previous page (merchant must agree when the slip names one),
     or the same-page receipt whose total is the amount of the statement row the slip's printed reference names (OCR may garble
@@ -482,7 +505,7 @@ def main():
     cfg = common.config(); STATEMENT_FILE, RECEIPTS_FILE, LEDGER_FILE = (cfg["names"][k] for k in ("statement", "receipts", "ledger"))
     statement = load_json(common.DATA / "statement.json"); ledger = load_json(common.DATA / "ledger.json"); groups = load_json(common.DATA / "groups.json")
     overrides = load_json(common.DATA / "overrides.json") if (common.DATA / "overrides.json").exists() else {}
-    groups = collapse_fragments(collapse_card_slips(groups, statement))
+    groups = collapse_fragments(collapse_card_slips(apply_group_overrides(groups, overrides), statement))
     groups, duplicates = mark_duplicates(groups)
     groups, other_month = split_other_month(groups, cfg["month"], statement)
     links, review = match_receipts(groups, statement, overrides)

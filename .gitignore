@@ -12,3 +12,4 @@ demo-docs/**
 scripts/abujhd/__pycache__/
 /data/*.zip
 .venv/
+.superpowers/

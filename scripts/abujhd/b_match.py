@@ -110,7 +110,13 @@ def score(g, row):
     support += min(2, len(overlap))
     return s + support if s == 3 or support else 0  # a 5-halala drift alone is not a candidate: needs date or merchant support
 
-_MULTI_DOC = re.compile(r"more than one|multiple documents|two documents", re.I)
+_MULTI_DOC = re.compile(r"more than one|multiple documents|two documents|two receipts|separate receipts", re.I)
+_ATTACHED_SLIP = re.compile(r"card slip|pos slip|card/pos|pos/card|mada|point[- ]of[- ]sale|payment slip|terminal receipt", re.I)
+
+def _looks_multi_document(notes):
+    """A healer note about two documents forces review, unless the second one is the purchase's own card/POS slip."""
+    n = notes or ""
+    return bool(_MULTI_DOC.search(n)) and not _ATTACHED_SLIP.search(n)
 
 def match_receipts(groups, rows, overrides):
     # a forced link may name any id merged into a record by collapse_*: resolve it to the record's head id
@@ -152,7 +158,7 @@ def match_receipts(groups, rows, overrides):
         if rival:
             contested.add(row_ref)
         # healer saw several documents in one crop: its fields describe only one of them, so a human decides
-        if top < 4 or tie or rival or row_ref in contested or _MULTI_DOC.search(g.get("notes") or ""):
+        if top < 4 or tie or rival or row_ref in contested or _looks_multi_document(g.get("notes")):
             links[gid] = None; review[gid] = [(r, s) for s, r in scored[:3]]
         else:
             links[gid] = row_ref; taken.add(row_ref)
@@ -193,7 +199,8 @@ def second_pass(groups, rows, links, review, tol=3.0):
     left = [g for g in left if not links.get(g["id"])]
     for g in left:
         f = g.get("fields") or {}
-        if receipt_amounts(g) or not (f.get("merchant") and f.get("date")): continue
+        has_total = any(a["total_candidate"] for a in g["amounts"]) or any(isinstance(f.get(k), (int, float)) for k in ("total", "card_slip_amount"))
+        if has_total or not (f.get("merchant") and f.get("date")): continue   # "no total was read", not "no amount at all": stray amounts must not block the suggestion
         toks = real(f["merchant"])
         c = [r for r in left_rows if r["date"] == f["date"] and (toks & real(r["merchant"]) or _prefixes(toks) & _prefixes(real(r["merchant"])))]
         if len(c) == 1: review[g["id"]] = [(c[0]["ref"], 0)]; left_rows.remove(c[0])

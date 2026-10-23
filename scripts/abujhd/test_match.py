@@ -284,6 +284,25 @@ def test_receipt_amounts_reranks_unhealed_totals():
     g["ids"] = ["u", "v"]                                            # a merged record keeps its merged flags (head text is partial)
     assert receipt_amounts(g) == {560.87}
 
+def test_no_total_suggestion_despite_stray_amounts():
+    # the healer read merchant and date but no total; a stray amount in the text must not block the suggestion
+    rows = [R("a", 93.0, "2026-09-08", "AL OTHAIM MARKETS COMPANY"), R("b", 6.0, "2026-09-08", "ASDAF")]
+    g = _left([G("g1", 26, [0.0], ["2026-09-08"], "Othaim", fields={"merchant": "أسواق العثيم / Othaim", "date": "2026-09-08", "total": None, "card_slip_amount": None})])[0]
+    g["amounts"] = [{"value": 0.0, "total_candidate": False}]
+    links, review = second_pass([g], rows, {"g1": None}, {})
+    assert links["g1"] is None and review["g1"] == [("a", 0)], (links, review)
+    # with a real total candidate the rule stays out of the way
+    g2 = _left([G("g2", 27, [52.5], ["2026-09-08"], "Cafe", fields={"merchant": "Cafe", "date": "2026-09-08", "total": None, "card_slip_amount": None})])[0]
+    assert "g2" not in second_pass([g2], [R("c", 50.0, "2026-09-08", "CAFE")], {"g2": None}, {})[1]
+
+def test_attached_card_slip_is_one_document():
+    row = R("r1", 900.0, "2026-09-02", "ALANDALUS TRADING CO")
+    g = G("g", 8, [900.0], ["2026-09-02"], "ALANDALUS TRADING", notes="The crop contains two documents: a simplified tax invoice and an attached Mada POS/card slip.")
+    assert match_receipts([g], [row], {})[0]["g"] == "r1"          # invoice + its own slip is one purchase
+    g2 = G("g2", 8, [900.0], ["2026-09-02"], "ALANDALUS TRADING", notes="The crop contains two separate receipts from different shops.")
+    links, review = match_receipts([g2], [row], {})
+    assert links["g2"] is None and "g2" in review                  # genuinely two documents still goes to a human
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

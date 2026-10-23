@@ -265,7 +265,8 @@ control group: zoom out, `{zoom}%` (tabular), zoom in, "Jump to citation" (`Loca
 Under it a second line: the source tabs `Statement · Receipt (n) · Ledger` as `role="tablist"` pills (same style as
 the report tabs, `h-7 text-xs`); a tab is `disabled` with `opacity-40` when its source list is empty. The active
 tab starts as `selection.source` and resets whenever the selection changes. A muted file line beside the tabs shows
-`meta.files[source]` and, for page sources, `page {p} of {n}` for the page currently most in view.
+`meta.files[source]` and, for page sources, `page {p} of {n}` for the page currently most in view; switching tabs
+clears that page number and mounts a fresh `PageStack` for the new file (keyed by source).
 
 Body: `flex-1 min-h-0 overflow-auto bg-muted/40 p-3`, hosting `PageStack` for `statement` and `receipt`, or the
 ledger table for `ledger`.

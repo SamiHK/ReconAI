@@ -185,7 +185,8 @@ back into ReconAI's Report tab (a later integration); OCR of the statement (text
 ## Running another month
 
 1. Copy `scripts/abujhd/config.example.json` to `data/<client>/config.json` and fill the three DocAI file ids,
-   the three file names (cited in the report), `month` (`YYYY-MM`) and the ledger `sheet`.
+   the three file names (cited in the report), `month` (`YYYY-MM`) and the ledger `sheet`. Add `"kb_id"` (the DocAI workspace id) if the report
+   should open inside ReconAI's Report tab; only one folder may carry a given `kb_id`.
 2. Run the three scripts with `--data data/<client>`: `a_refine.py` (add `--healer openai` or `claude`),
    then `b_match.py`, then `c_report.py`. `DOCAI_API_KEY` is only needed when `raw/` lacks a file.
 3. Use a new data directory per month: `raw/`, `pages/` renders and the healer `cache/` are reused when present,

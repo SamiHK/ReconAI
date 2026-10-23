@@ -70,4 +70,21 @@ describe('canAccessKb', () => {
     expect(await canAccessKb(KB, 'key-eeeeeeee', counted)).toBe(true);
     expect(calls).toBe(1);
   });
+  test('keys that share their last 8 characters do not share a cached verdict', async () => {
+    const kb = 'kb-suffix-collision';
+    let calls = 0;
+    const listing = (ids: string[]) => async () => { calls++; return new Response(JSON.stringify({ knowledge_bases: ids.map(id => ({ id })) })); };
+    expect(await canAccessKb(kb, 'aaaa-SAMESUFF', listing([kb]))).toBe(true);
+    expect(await canAccessKb(kb, 'bbbb-SAMESUFF', listing(['other']))).toBe(false);
+    expect(calls).toBe(2);
+  });
+  test('a throwing lookup is not cached: the next ok lookup for the same key decides', async () => {
+    const kb = 'kb-transient-failure';
+    let calls = 0;
+    const down = async () => { calls++; throw new Error('down'); };
+    const up = async () => { calls++; return new Response(JSON.stringify({ knowledge_bases: [{ id: kb }] })); };
+    expect(await canAccessKb(kb, 'key-ffffffff', down)).toBe(false);
+    expect(await canAccessKb(kb, 'key-ffffffff', up)).toBe(true);
+    expect(calls).toBe(2);
+  });
 });

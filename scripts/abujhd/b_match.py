@@ -17,7 +17,7 @@ def norm_merchant(s):
     s = _fold(s)
     toks = set()
     for t in re.split(r"[^a-z0-9؀-ۿ]+", s):
-        if len(t) < 3 or t in STOP: continue
+        if len(t) < 3 or t in STOP or t.isdigit(): continue   # a number is not a name (p78 footer: "Total Invoice | 275.00")
         toks.add(ALIASES.get(t, t))
     return toks
 

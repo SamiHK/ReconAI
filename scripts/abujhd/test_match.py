@@ -430,6 +430,20 @@ def test_unhealed_card_slip_joins_the_receipt_it_pays_for():
     rcpt = G("r", 30, [97.5], ["2026-09-08"], "MAZA REST", kind="receipt", fields={"merchant": "MAZA REST", "date": "2026-09-08", "total": 97.5}); rcpt["text"] = "MAZA REST\nmada PURCHASE AMOUNT 97.50 625101016891"
     assert [o["ids"] for o in collapse_card_slips([rcpt, other], rows)] == [["r"], ["o"]]
 
+def test_split_invoice_halves_merge_despite_a_numeric_header_line():
+    # p78: the header+items half (merchant, total computed from the lines) and the totals block whose first line is "Total Invoice | 275.00"
+    head = G("h", 78, [250.0, 37.5], ["2026-09-24"], "ALWAN PAINT COMPANY", kind="invoice", fields={"merchant": "ALWAN PAINT COMPANY", "date": "2026-09-24", "total": 316.25, "invoice_no": "1214"})
+    foot = G("f", 78, [275.0, 41.25, 316.25], ["2026-09-24"], "Total Invoice | 275.00", kind="invoice", fields={"merchant": None, "date": "2026-09-24", "total": 316.25, "invoice_no": None})
+    foot["text"] = "Total Invoice | 275.00\nVAT Amount | 41.25\nNet Invoice | 316.25"
+    for g in (head, foot): g["ids"] = [g["id"]]; g["boxes"] = [(78, None)]
+    assert real_merchant_tokens(foot) == set()                    # a number is not a shop name
+    out = collapse_fragments([foot, head])
+    assert [o["ids"] for o in out] == [["h", "f"]], out
+    # merged, the record is the day's only candidate for the 316.00 card row and links by near-amount (0.25 off)
+    row = R("r", 316.0, "2026-09-24", "mwssh sbgh alalwanalauon amro"); out[0]["confidence"] = 0.98
+    links, review = match_receipts(out, [row], {}); links, review = second_pass(out, [row], links, review)
+    assert links["h"] == "r", (links, review)
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

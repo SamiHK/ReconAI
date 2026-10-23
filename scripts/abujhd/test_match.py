@@ -503,6 +503,28 @@ def test_bundle_of_invoices_paid_in_two_same_minute_card_payments():
     links, review = match_receipts(groups, rows, {}); links, review = second_pass(groups, rows, links, review)
     assert links["i1"] is None and links["i2"] is None and links["i3"] is None and {r for r, _ in review["five"]} == {"c5", "z"}, (links, review)
 
+from b_match import mark_duplicates
+
+def test_duplicate_copies_are_marked_and_the_first_copy_links():
+    # p12/p30: battery invoice 4942 (280.00, 06/09) filed twice; the card row must go to the first copy, the second is a DUPLICATE
+    row = R("r", 280.0, "2026-09-06", "SHINING WAY CORPOTATION FGen", time="11:19:21")
+    F = lambda m, t=280.0: {"merchant": m, "date": "2026-09-06", "total": t, "invoice_no": "4942"}
+    a = _left([G("a", 12, [280.0], ["2026-09-06"], "مؤسسة الطريق المضي للتجارة", kind="invoice", fields=F("مؤسسة الطريق المضي للتجارة"))])[0]
+    b = _left([G("b", 30, [280.0], ["2026-09-06"], "مؤسسة الطريق المضى للتجارة", kind="invoice", fields=F("مؤسسة الطريق المضى للتجارة"))])[0]      # ي/ى: the same shop
+    o = _left([G("o", 31, [290.0], ["2026-09-06"], "Somebody Else", kind="invoice", fields=F("Somebody Else", 290.0))])[0]                      # same number, another shop and total
+    keep, dups = mark_duplicates([a, b, o])
+    assert [g["id"] for g in keep] == ["a", "o"] and [g["id"] for g in dups] == ["b"] and dups[0]["duplicate_of"] == "a", (keep, dups)
+    links, review = match_receipts(keep, [row], {})
+    assert links["a"] == "r" and not review, (links, review)                                        # no rival copy: a plain match
+    rows2, rc = assign_statuses([row], keep, links, review, tie_out_ledger([row], []), [], duplicates=dups)
+    assert rows2[0]["status"] == "MATCHED" and {g["id"]: g["status"] for g in rc} == {"a": "LINKED", "o": "ORPHAN", "b": "DUPLICATE"}
+    dup = next(g for g in rc if g["id"] == "b")
+    assert dup["ref"] is None and "a" in dup["reason"] and "4942" in dup["reason"] and dup["citations"]["statement"]["ref"] == "r", dup
+    # no invoice number, or a different total: two purchases, not a copy
+    c1, c2 = _left([G("c1", 5, [10.0], ["2026-09-06"], "Shop", fields={"merchant": "Shop", "date": "2026-09-06", "total": 10.0, "invoice_no": None}),
+                    G("c2", 6, [10.0], ["2026-09-06"], "Shop", fields={"merchant": "Shop", "date": "2026-09-06", "total": 10.0, "invoice_no": None})])
+    assert mark_duplicates([c1, c2])[1] == [] and mark_duplicates([a, o])[1] == []
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

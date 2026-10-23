@@ -244,6 +244,17 @@ def split_other_month(groups, month, rows=()):
 
 def _refs(v): return v if isinstance(v, list) else [v] if v else []
 
+def mark_duplicates(groups):
+    """A second copy of a document (same healer invoice number, shop and total as an earlier group: p12/p30 invoice 4942, p82/p83
+    fuel receipts) leaves the matching, so the first copy links alone instead of tying with its twin; it is reported as DUPLICATE."""
+    keep, dups = [], []
+    for g in groups:
+        f = g.get("fields") or {}
+        first = next((h for h in keep if f.get("invoice_no") and f.get("total") is not None and (h.get("fields") or {}).get("invoice_no") == f["invoice_no"]
+                      and (h.get("fields") or {}).get("total") == f["total"] and real_merchant_tokens(h) & real_merchant_tokens(g)), None)
+        (dups if first else keep).append({**g, "duplicate_of": first["id"]} if first else g)
+    return keep, dups
+
 def _same_day(g, r):
     """The row's day under some plausible reading of a receipt date: the year off (p10-g2: 2025 for 2026), day/month swapped, ٣ for ٩."""
     return any(x == r["date"] for d in _dates(g) for x in _date_readings(d, int(r["date"][:4])))
@@ -372,7 +383,7 @@ def _receipt_cites(g):
     return [{"file": RECEIPTS_FILE, "page": p, "group_id": gid, "box": box, "crop": f"crops/{gid}.png"}
             for gid, (p, box) in zip(g.get("ids") or [g["id"]], g.get("boxes") or [(g["page"], g.get("box"))])]
 
-def assign_statuses(statement, groups, links, review, tieout, ledger, other_month=(), month=None):
+def assign_statuses(statement, groups, links, review, tieout, ledger, other_month=(), month=None, duplicates=()):
     led = {l["code"]: l for l in ledger}
     rollup = (tieout["purchases_vs_rollup"]["rollup_codes"] or [None])[0]
     def ledger_cite(code, relation):
@@ -425,6 +436,11 @@ def assign_statuses(statement, groups, links, review, tieout, ledger, other_mont
         receipts.append({**g, "ref": None, "refs": [], "status": "OTHER_MONTH", "review": [],
                          "citations": {"receipt": _receipt_cites(g), "statement": None, "ledger": None},
                          "reason": f"dated {d}, outside {label}: another month's pack, or a wrong date on the receipt"})
+    for g in duplicates:
+        first = next((r for r in receipts if r["id"] == g["duplicate_of"]), {})
+        receipts.append({**g, "ref": None, "refs": [], "status": "DUPLICATE", "review": [],
+                         "citations": {"receipt": _receipt_cites(g), "statement": (first.get("citations") or {}).get("statement"), "ledger": (first.get("citations") or {}).get("ledger")},
+                         "reason": f"second copy of {g['duplicate_of']} p{first.get('page', '?')} (invoice {(g.get('fields') or {}).get('invoice_no')})"})
     return rows, receipts
 
 def main():
@@ -434,11 +450,12 @@ def main():
     statement = load_json(common.DATA / "statement.json"); ledger = load_json(common.DATA / "ledger.json"); groups = load_json(common.DATA / "groups.json")
     overrides = load_json(common.DATA / "overrides.json") if (common.DATA / "overrides.json").exists() else {}
     groups = collapse_fragments(collapse_card_slips(groups, statement))
+    groups, duplicates = mark_duplicates(groups)
     groups, other_month = split_other_month(groups, cfg["month"], statement)
     links, review = match_receipts(groups, statement, overrides)
     links, review = second_pass(groups, statement, links, review)
     tieout = tie_out_ledger(statement, ledger, cfg["month"])
-    rows, receipts = assign_statuses(statement, groups, links, review, tieout, ledger, other_month=other_month, month=cfg["month"])
+    rows, receipts = assign_statuses(statement, groups, links, review, tieout, ledger, other_month=other_month, month=cfg["month"], duplicates=duplicates)
     import collections
     ovs = collections.Counter((r["orange"], r["status"]) for r in rows if r["kind"] == "purchase")
     summary = {"rows": dict(collections.Counter(r["status"] for r in rows)), "receipts": dict(collections.Counter(r["status"] for r in receipts))}
@@ -447,6 +464,7 @@ def main():
     print("rows:", summary["rows"]); print("receipts:", summary["receipts"]); print("tieout:", {k: v for k, v in tieout.items() if k != "ledger_status" and k != "small_credits"})
     for gid, cands in review.items(): print("REVIEW", gid, cands)
     for g in other_month: print("OTHER_MONTH", g["id"], (g.get("fields") or {}).get("date") or g["dates"][:1])
+    for g in duplicates: print("DUPLICATE", g["id"], "of", g["duplicate_of"])
 
 if __name__ == "__main__":
     main()

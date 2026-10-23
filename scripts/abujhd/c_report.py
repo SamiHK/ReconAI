@@ -60,7 +60,7 @@ STATUS = {
     "MISSING_RECEIPT": ("Missing receipt", "✕", "var(--bad)"), "ORPHAN": ("No card row", "✕", "var(--bad)"),
     "REVIEW": ("Needs a decision", "?", "var(--rev)"),
     "UNEXPLAINED": ("Not in ledger", "!", "var(--warn)"), "AMOUNT_MISMATCH": ("Amounts differ", "!", "var(--warn)"),
-    "OTHER_MONTH": ("Another month", "!", "var(--warn)"),
+    "OTHER_MONTH": ("Another month", "!", "var(--warn)"), "DUPLICATE": ("Duplicate copy", "=", "var(--neutral)"),
 }
 HEX = {"var(--ok)": "#0A7F3F", "var(--bad)": "#B42318", "var(--rev)": "#554BC5", "var(--warn)": "#A15C00", "var(--neutral)": "#71717A"}
 

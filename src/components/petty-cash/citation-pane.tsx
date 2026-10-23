@@ -89,7 +89,10 @@ export function CitationPane({ report, kbId, sources, initialSource, onClose }: 
               role="tab"
               aria-selected={source === t.key}
               disabled={!available[t.key]}
-              onClick={() => setSource(t.key)}
+              onClick={() => {
+                setSource(t.key);
+                setPageInView(null); // the indicator belongs to the file being shown; a fresh stack reports its own page
+              }}
               className={cn(
                 'h-7 rounded-full px-3 text-xs font-medium transition-colors disabled:opacity-40',
                 source === t.key ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted hover:text-foreground disabled:hover:bg-transparent'
@@ -107,7 +110,8 @@ export function CitationPane({ report, kbId, sources, initialSource, onClose }: 
       </div>
       <div className="min-h-0 flex-1">
         {isPages ? (
-          <PageStack images={images} boxes={boxes} activeIndex={activeIndex} jumpSignal={jump} zoom={zoom} onPageInView={setPageInView} />
+          // Keyed by source: the statement file and the receipts file each get their own stack (fresh scroll, fresh image nodes).
+          <PageStack key={source} images={images} boxes={boxes} activeIndex={activeIndex} jumpSignal={jump} zoom={zoom} onPageInView={setPageInView} />
         ) : ledger ? (
           <div className="h-full space-y-2 overflow-auto p-3">
             <p className="text-xs text-muted-foreground">

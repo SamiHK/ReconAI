@@ -44,7 +44,7 @@ Coordinates stay in the matcher's 0-1000 page space, `[x0, y0, x1, y1]`.
   "kpis": {
     "card_spend": 17439.1, "purchase_count": 104, "atm_count": 19,
     "purchases_amount": 16139.1, "evidenced_amount": 13400.0,
-    "rollup": 19420.8, "open_gap": -1981.7,
+    "rollup": 19420.8, "open_gap": 1981.7,
     "missing_count": 9, "missing_amount": 1234.5
   },
   "counts": { "rows": { "MATCHED": 76, "REVIEW": 14 }, "receipts": { "LINKED": 79, "ORPHAN": 67, "REVIEW": 26 } },
@@ -190,7 +190,7 @@ Table (`Table` with `TABLE_HEAD_BAND` headers, `text-sm`, rows `hover:bg-muted/4
 | Status | `StatusChip` |
 | Date | `date` on one line, `time.slice(0,5)` muted beneath; an `orange` row adds a `size-2 rounded-full bg-amber-500` dot with `title="Highlighted on the statement"` |
 | Amount | `money(amount)` right-aligned `tabular-nums` |
-| Merchant | `merchant` truncated at 48 chars with `title`, `kind` muted beneath |
+| Merchant | `merchant` in a `max-w-[260px] truncate` cell with the full name in `title`, `kind` muted beneath |
 | Evidence | `CitationChip`s: `Stmt`, one `Receipt p{page}` per receipt citation, `Ledger {cell}` when ledger is set |
 | Note | `reason`, muted |
 
@@ -309,9 +309,9 @@ URLs come from `imageUrl(kbId, path)` = `/api/petty-cash/${kbId}/${path}`.
 
 ### Ledger source
 
-A `Table` of `report.ledger` filtered to `line.month === meta.month`, columns Code, Date, Debit, Credit, Text. The
-cited line (`code === ledger.code`) gets `bg-primary/10` and a `ref` that is scrolled into view (`block: 'center'`)
-when the tab opens. Above it one line: `{cell} · {code} · {money(amount)} · {relation}` ("rolled-up" renders as
+The same `LedgerLines` table the Ledger tab uses (Code, Date, Debit, Credit, Text, Status) over `report.ledger`
+filtered to `line.month === meta.month`. Every line whose `code === ledger.code` gets `bg-primary/10`; the first is
+scrolled into view (`block: 'center'`) when the tab opens. Above it one line: `{cell} · {code} · {money(amount)} · {relation}` ("rolled-up" renders as
 "this row is rolled up into the line below", "tied" as "this row is tied to the line below").
 
 ### Layout

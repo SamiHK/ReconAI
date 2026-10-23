@@ -303,6 +303,39 @@ def test_attached_card_slip_is_one_document():
     links, review = match_receipts([g2], [row], {})
     assert links["g2"] is None and "g2" in review                  # genuinely two documents still goes to a human
 
+from b_match import split_other_month
+
+def test_split_other_month():
+    aug = G("a", 1, [10.0], ["2026-08-14"], "Shop")                      # previous month
+    oct_ = G("o", 2, [10.0], ["2026-10-02"], "Shop")                     # next month
+    edge = G("e", 3, [10.0], ["2026-08-31"], "Shop")                     # one day before: stays (card can post next day)
+    mixed = G("m", 4, [10.0], ["2025-09-03", "2026-09-03"], "Shop")      # OCR gave two years, one in month: stays
+    far = G("f", 5, [10.0], ["2024-09-20"], "Shop")                      # years off: unreadable date, not another month
+    nodate = G("n", 6, [10.0], [], "Shop")
+    healed = G("h", 7, [10.0], ["2026-09-05"], "Shop", fields={"merchant": "Shop", "date": "2026-07-05", "total": 10.0, "card_slip_amount": None})  # healer date wins
+    yearoff = G("y", 8, [10.0], ["2025-09-02"], "Shop")                  # OCR year off by one: this month
+    swapped = G("w", 9, [10.0], ["2026-12-09"], "Shop")                  # day/month swapped (12 Sep): this month
+    arabic = G("q", 10, [10.0], ["2026-03-16"], "Shop")                   # ٣ read for ٩: 16 Sep, this month
+    keep, other = split_other_month([aug, oct_, edge, mixed, far, nodate, healed, yearoff, swapped, arabic], "2026-09")
+    assert [g["id"] for g in other] == ["a", "o", "h"], [g["id"] for g in other]
+    assert [g["id"] for g in keep] == ["e", "m", "f", "n", "y", "w", "q"], [g["id"] for g in keep]
+    # an amount that matches a purchase row of this statement proves the receipt is this month's, whatever the date says
+    keep2, other2 = split_other_month([aug], "2026-09", [R("r", 10.0, "2026-09-14", "SHOP")])
+    assert [g["id"] for g in keep2] == ["a"] and other2 == []
+
+def test_other_month_receipts_get_their_own_status():
+    rows = [R("r1", 10.0, "2026-09-05", "SHOP")]
+    aug = G("a", 1, [10.0], ["2026-08-14"], "Shop"); aug["box"] = [0, 0, 1, 1]
+    sep = G("s", 2, [10.0], ["2026-09-05"], "Shop"); sep["box"] = [0, 0, 1, 1]
+    keep, other = split_other_month([aug, sep], "2026-09")
+    links, review = match_receipts(keep, rows, {})
+    rows2, receipts = assign_statuses(rows, keep, links, review, tie_out_ledger(rows, []), [], other_month=other)
+    st = {r["id"]: r["status"] for r in receipts}
+    assert st == {"s": "LINKED", "a": "OTHER_MONTH"}, st
+    a = next(r for r in receipts if r["id"] == "a")
+    assert a["ref"] is None and "2026-08-14" in a["reason"] and "September 2026" in a["reason"], a["reason"]
+    assert rows2[0]["status"] == "MATCHED"                                # the August receipt never competed for the September row
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

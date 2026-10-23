@@ -166,6 +166,38 @@ def match_receipts(groups, rows, overrides):
 
 def _r2(x): return round(x, 2)
 
+def split_other_month(groups, month, rows=()):
+    """Receipts that belong to another month: every readable date is outside the period (plus a day either side, since a
+    card can post next day) under every plausible reading, within a year of it, and no amount on the receipt matches a
+    purchase row of this statement. Plausible readings cover what OCR gets wrong on these scans: the year off (same
+    month and day), day and month swapped, and the Arabic digits ٣/٩ confused (month 03 vs 09). A date years off is an
+    unreadable date, not another month; no date means nothing to judge. The healer's date wins over derived dates."""
+    from datetime import date, timedelta
+    y, m = (int(x) for x in month.split("-"))
+    start = date(y, m, 1) - timedelta(days=1)
+    end = date(y + (m == 12), m % 12 + 1, 1)
+    def inside(yy, mm, dd):
+        try: return start <= date(yy, mm, dd) <= end
+        except ValueError: return False
+    def verdict(d):
+        try: yy, mm, dd = (int(x) for x in d.split("-"))
+        except (ValueError, AttributeError): return None
+        swap = {3: 9, 9: 3}
+        readings = [(yy, mm, dd), (y, mm, dd), (yy, dd, mm), (y, dd, mm), (yy, swap.get(mm, mm), dd), (y, swap.get(mm, mm), dd)]
+        if any(inside(*r) for r in readings): return "in"
+        try: return "other" if abs((date(yy, mm, dd) - start).days) <= 366 else None
+        except ValueError: return None
+    amounts_this_month = {round(r["amount"], 2) for r in rows if r.get("kind", "purchase") == "purchase"}
+    keep, other = [], []
+    for g in groups:
+        f = g.get("fields") or {}
+        ds = [f["date"]] if f.get("date") else list(g["dates"])
+        vs = [verdict(d) for d in ds]
+        dated_elsewhere = bool(vs) and "in" not in vs and "other" in vs
+        amount_here = bool(receipt_amounts(g) & amounts_this_month)
+        (other if dated_elsewhere and not amount_here else keep).append(g)
+    return keep, other
+
 def _refs(v): return v if isinstance(v, list) else [v] if v else []
 
 def second_pass(groups, rows, links, review, tol=3.0):
@@ -249,7 +281,7 @@ def _receipt_cites(g):
     return [{"file": RECEIPTS_FILE, "page": p, "group_id": gid, "box": box, "crop": f"crops/{gid}.png"}
             for gid, (p, box) in zip(g.get("ids") or [g["id"]], g.get("boxes") or [(g["page"], g.get("box"))])]
 
-def assign_statuses(statement, groups, links, review, tieout, ledger):
+def assign_statuses(statement, groups, links, review, tieout, ledger, other_month=(), month=None):
     led = {l["code"]: l for l in ledger}
     rollup = (tieout["purchases_vs_rollup"]["rollup_codes"] or [None])[0]
     def ledger_cite(code, relation):
@@ -293,6 +325,15 @@ def assign_statuses(statement, groups, links, review, tieout, ledger):
         receipts.append({**g, "ref": ref, "refs": refs, "status": st, "review": review.get(g["id"], []),
                          "citations": {"receipt": _receipt_cites(g), "statement": rc.get("statement"), "ledger": rc.get("ledger")},
                          "reason": "linked" if ref else "ambiguous or weak candidates" if st == "REVIEW" else "no statement row with this amount (cash purchase? wrong total?)"})
+    from datetime import datetime
+    month = month or (statement[0]["date"][:7] if statement else None)   # the statement is the period
+    label = datetime.strptime(month, "%Y-%m").strftime("%B %Y") if month else "the period"
+    for g in other_month:
+        f = g.get("fields") or {}
+        d = f.get("date") or (g["dates"][0] if g["dates"] else "?")
+        receipts.append({**g, "ref": None, "refs": [], "status": "OTHER_MONTH", "review": [],
+                         "citations": {"receipt": _receipt_cites(g), "statement": None, "ledger": None},
+                         "reason": f"dated {d}, outside {label}: another month's pack, or a wrong date on the receipt"})
     return rows, receipts
 
 def main():
@@ -302,10 +343,11 @@ def main():
     statement = load_json(common.DATA / "statement.json"); ledger = load_json(common.DATA / "ledger.json"); groups = load_json(common.DATA / "groups.json")
     overrides = load_json(common.DATA / "overrides.json") if (common.DATA / "overrides.json").exists() else {}
     groups = collapse_fragments(collapse_card_slips(groups))
+    groups, other_month = split_other_month(groups, cfg["month"], statement)
     links, review = match_receipts(groups, statement, overrides)
     links, review = second_pass(groups, statement, links, review)
     tieout = tie_out_ledger(statement, ledger, cfg["month"])
-    rows, receipts = assign_statuses(statement, groups, links, review, tieout, ledger)
+    rows, receipts = assign_statuses(statement, groups, links, review, tieout, ledger, other_month=other_month, month=cfg["month"])
     import collections
     ovs = collections.Counter((r["orange"], r["status"]) for r in rows if r["kind"] == "purchase")
     summary = {"rows": dict(collections.Counter(r["status"] for r in rows)), "receipts": dict(collections.Counter(r["status"] for r in receipts))}
@@ -313,6 +355,7 @@ def main():
                                               "orange_vs_status": {f"{'orange' if o else 'plain'}|{s}": n for (o, s), n in ovs.items()}, "summary": summary})
     print("rows:", summary["rows"]); print("receipts:", summary["receipts"]); print("tieout:", {k: v for k, v in tieout.items() if k != "ledger_status" and k != "small_credits"})
     for gid, cands in review.items(): print("REVIEW", gid, cands)
+    for g in other_month: print("OTHER_MONTH", g["id"], (g.get("fields") or {}).get("date") or g["dates"][:1])
 
 if __name__ == "__main__":
     main()

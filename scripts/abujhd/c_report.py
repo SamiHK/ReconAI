@@ -60,6 +60,7 @@ STATUS = {
     "MISSING_RECEIPT": ("Missing receipt", "✕", "var(--bad)"), "ORPHAN": ("No card row", "✕", "var(--bad)"),
     "REVIEW": ("Needs a decision", "?", "var(--rev)"),
     "UNEXPLAINED": ("Not in ledger", "!", "var(--warn)"), "AMOUNT_MISMATCH": ("Amounts differ", "!", "var(--warn)"),
+    "OTHER_MONTH": ("Another month", "!", "var(--warn)"),
 }
 HEX = {"var(--ok)": "#0A7F3F", "var(--bad)": "#B42318", "var(--rev)": "#554BC5", "var(--warn)": "#A15C00", "var(--neutral)": "#71717A"}
 
@@ -222,6 +223,8 @@ def main():
             lambda r: f'<tr><td class=mono>{esc(r["date"])}</td><td class=num>{money(r["amount"])}</td><td>{esc(r["merchant"])}</td><td class=mono>{esc(r["ref"])}</td><td>{rowev(r)}</td><td class=mute>A receipt from {esc(r["date"])} (give or take a day) for {money(r["amount"])} SAR at this merchant. If it was paid by card, the slip shows the same amount.</td></tr>')
     section("Receipts with no card transaction", ["Evidence", "Page · group", "Amounts", "Merchant", "What to look for"], [g for g in receipts if g["status"] == "ORPHAN"],
             lambda g: f'<tr><td>{evidence(None, g["citations"]["receipt"], None)}</td><td class=mono>p{esc(g["page"])} {esc(g["id"])}</td><td class=num>{", ".join(money(v) for v in sorted({a["value"] for a in g["amounts"]})[:4]) or "<span class=mute>no amount read</span>"}</td><td>{esc((g.get("fields") or {}).get("merchant") or (g["merchant_candidates"] or [""])[0])}</td><td class=mute>Paid in cash rather than by card, a misread total, or a receipt from another month. {esc(g.get("notes") or "")}</td></tr>')
+    section("Receipts from another month", ["Evidence", "Page · group", "Receipt date", "Amounts", "Merchant", "What to look for"], [g for g in receipts if g["status"] == "OTHER_MONTH"],
+            lambda g: f'<tr><td>{evidence(None, g["citations"]["receipt"], None)}</td><td class=mono>p{esc(g["page"])} {esc(g["id"])}</td><td class=mono>{esc((g.get("fields") or {}).get("date") or (g["dates"] or ["?"])[0])}</td><td class=num>{", ".join(money(v) for v in sorted({a["value"] for a in g["amounts"]})[:4]) or "<span class=mute>no amount read</span>"}</td><td>{esc((g.get("fields") or {}).get("merchant") or (g["merchant_candidates"] or [""])[0])}</td><td class=mute>Outside this statement\'s period. Either it belongs in another month\'s pack, or the printed date is wrong; it was not matched against this month\'s card rows.</td></tr>')
     section("Amounts that differ", ["Date", "SAR", "Evidence", "Ref · note", "What to look for"], [r for r in rows if r["status"] == "AMOUNT_MISMATCH"],
             lambda r: f'<tr><td class=mono>{esc(r["date"])}</td><td class=num>{money(r["amount"])}</td><td>{rowev(r)}</td><td class=mono>{esc(r["ref"])}<br><span class=mute>{esc(r["reason"])}</span></td><td class=mute>The statement and the receipt disagree. Usual causes: a tip, VAT added at the till, or part of the bill paid another way.</td></tr>')
     section("Decisions needed", ["Evidence", "Page · group", "Candidate statement rows", "What to do"], [g for g in receipts if g["status"] == "REVIEW"],

@@ -7,6 +7,9 @@ node_modules
 tsconfig.tsbuildinfo
 demo-docs/**
 /data/abujhd/
+/data/abujhd-local/
 /ABUJHD/
 scripts/abujhd/__pycache__/
 /data/*.zip
+.venv/
+.superpowers/

@@ -42,13 +42,13 @@ export function SheetPreview({ fileId, filename, onClose, className, style }: {
 
   return (
     <div
-      className={`flex h-[520px] flex-col overflow-hidden rounded-xl border border-border bg-muted/30 ${className ?? ''}`}
+      className={`flex h-[520px] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm ${className ?? ''}`}
       style={style}
     >
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
         <span className="truncate font-mono text-xs text-foreground">{filename}</span>
         {onClose && (
-          <Button variant="ghost" size="sm" className="px-1.5 text-secondary hover:text-foreground" title="Close pane" onClick={onClose}>
+          <Button variant="ghost" size="sm" className="px-1.5 text-muted-foreground hover:text-foreground" title="Close pane" onClick={onClose}>
             <XIcon className="size-3.5" />
           </Button>
         )}
@@ -64,7 +64,7 @@ export function SheetPreview({ fileId, filename, onClose, className, style }: {
               className={`rounded-md border px-2 py-0.5 text-xs ${
                 i === active
                   ? 'border-primary/50 bg-primary/10 text-primary'
-                  : 'border-border/50 bg-background text-secondary hover:text-foreground'
+                  : 'border-border/50 bg-background text-muted-foreground hover:text-foreground'
               }`}
             >
               {s.name}
@@ -74,20 +74,20 @@ export function SheetPreview({ fileId, filename, onClose, className, style }: {
       )}
 
       <div className="flex-1 overflow-auto">
-        {status === 'loading' && <Loader2 className="mx-auto mt-10 size-6 animate-spin text-secondary" />}
+        {status === 'loading' && <Loader2 className="mx-auto mt-10 size-6 animate-spin text-muted-foreground" />}
         {status === 'error' && (
-          <p className="mt-10 text-center text-xs text-secondary">Failed to load the parsed sheet.</p>
+          <p className="mt-10 text-center text-xs text-muted-foreground">Failed to load the parsed sheet.</p>
         )}
         {status === 'ready' && !sheet && (
-          <p className="mt-10 text-center text-xs text-secondary">No sheet data in this file.</p>
+          <p className="mt-10 text-center text-xs text-muted-foreground">No sheet data in this file.</p>
         )}
         {sheet && (
           <table className="border-collapse text-xs">
             <thead className="sticky top-0 z-10 bg-muted/60">
               <tr>
-                <th className="sticky left-0 z-20 border-b border-r border-border/50 bg-muted/80 px-2 py-1 text-right font-semibold text-secondary">#</th>
+                <th className="sticky left-0 z-20 border-b border-r border-border/50 bg-muted/80 px-2 py-1 text-right font-semibold text-muted-foreground">#</th>
                 {cols.map(c => (
-                  <th key={c} className="min-w-[120px] border-b border-r border-border/40 px-3 py-1 text-left font-semibold text-secondary">
+                  <th key={c} className="min-w-[120px] border-b border-r border-border/40 px-3 py-1 text-left font-semibold text-muted-foreground">
                     {colLabel(c)}
                   </th>
                 ))}
@@ -96,7 +96,7 @@ export function SheetPreview({ fileId, filename, onClose, className, style }: {
             <tbody>
               {sheet.cells.map((row, r) => (
                 <tr key={r}>
-                  <td className="sticky left-0 z-10 border-r border-border/40 bg-muted/20 px-2 py-1 text-right font-mono text-[11px] text-secondary">
+                  <td className="sticky left-0 z-10 border-r border-border/40 bg-muted/20 px-2 py-1 text-right font-mono text-[11px] text-muted-foreground">
                     {r + 1}
                   </td>
                   {row.map((cell, c) => (

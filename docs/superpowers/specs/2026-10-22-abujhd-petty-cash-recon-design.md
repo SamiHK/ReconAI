@@ -6,7 +6,7 @@ Date: 2026-10-22. Branch: `feat/abujhd-petty-cash`. Scripts only; no ReconAI app
 
 Client ABUJHD runs petty cash through a prepaid card at the bank, held by the cardholder.
 For September 2026 we have three sources in DocAI workspace `ABUJHD`
-(local Docker DocAI at `http://localhost:8080`; file ids live in the git-ignored `data/<client>/config.json`):
+(DocAI at `DOCAI_BASE_URL` from `.env.local`, default the hosted instance; file ids live in the git-ignored `data/<client>/config.json`):
 
 | Source | File | What it really is | Parse quality |
 |---|---|---|---|
@@ -30,7 +30,7 @@ scripts/abujhd/
   a_refine.py     EDA + clean + group + heal → segments.refined.json, groups.json,
                   statement.json, ledger.json, eda.md
   b_match.py      key relation + gap analysis → matches.json
-  c_report.py     whiteboard → report.html
+  c_report.py     report.json for the app's Report tab (2026-10-23-petty-cash-report-ui-design.md)
   test_match.py   assert-based check, run with plain `python3 scripts/abujhd/test_match.py`
 data/abujhd/      git-ignored
   config.json     file ids + names, month, ledger sheet (template: scripts/abujhd/config.example.json)
@@ -39,7 +39,7 @@ data/abujhd/      git-ignored
   crops/          <group-id>.png, the union box of a group, cut from its page render
   cache/          healer responses keyed by sha256(crop + segments)
   overrides.json  human corrections (groups) and link overrides, honoured by A and B
-  segments.refined.json groups.json statement.json ledger.json matches.json eda.md report.html
+  segments.refined.json groups.json statement.json ledger.json matches.json eda.md report.json
 ```
 
 Every script takes `--data data/abujhd` (default), is idempotent and re-runnable, and
@@ -147,7 +147,31 @@ missing, override) that fails if scoring or the greedy pass breaks.
 **Checkpoint B.** Print the summary table and the `REVIEW` list with both candidates' evidence.
 User confirms or writes overrides; rerun B.
 
+## Step B2 — second pass
+
+`second_pass()` runs after pass 1 and touches leftovers only: purchase rows nobody linked and nobody listed for review,
+and receipts with no link and no review entry. Pass 1 results are never changed. Three rules, in order:
+
+1. **Split payment.** Two same-day rows with the identical statement merchant string whose amounts sum to the
+   receipt total within 0.05 (one such pair, unambiguous) are both linked to the receipt.
+2. **Near amount.** A leftover receipt may link to a leftover row only when all hold: same day; the amount differs by at
+   most `min(3.00, 10% of the row amount)`; the merchant overlaps the row's (generic tokens and the "markets"
+   alias removed; 5-char prefixes count) or the healer's `confidence` is at least 0.7; and the pairing is unique both
+   ways against every same-day row and receipt, taken or not. The row shows `AMOUNT_MISMATCH` with
+   `(total differs by X.XX)`, so it is flagged, not promoted to `MATCHED`.
+3. **No total.** A healed receipt with merchant and date but no amount, and exactly one same-day row whose merchant
+   overlaps, becomes a `REVIEW` suggestion for that row. It is never a match.
+
+A `links` value in `matches.json` may therefore be a list of refs (split), and `matches.json` receipts carry `refs`
+alongside `ref`. `overrides.json` `links` cannot express a split: it takes one ref or null per receipt.
+
+Pass-1 amount candidates for unmerged, unhealed groups now come from `common.total_flags` (the ranker that prefers
+total-family keywords), so pass 1 is affected by the ranker too; the September gate showed no change.
+
 ## Step C — `c_report.py`
+
+> Superseded 2026-10-23: Step C now writes `report.json`, rendered by the app (see
+> `2026-10-23-petty-cash-report-ui-design.md`). The description below is the original static-HTML design.
 
 `report.html`, single self-contained file (CSS inline, images referenced relatively from
 `data/abujhd/`), no framework, light and dark via `prefers-color-scheme`.
@@ -164,6 +188,18 @@ User confirms or writes overrides; rerun B.
 - Everything cites: statement ref, page number, crop id, ledger code.
 
 **Checkpoint C.** User opens `report.html`; one iteration on clarity.
+
+## Regression gate
+
+```
+python scripts/abujhd/check_vs_workbook.py --data data/abujhd --workbook <xlsx> --min-agree 85 --max-wrong 5
+```
+
+Compares `matches.json` with the human reconciliation workbook (sheet "Card statement Sep"), purchase rows only.
+**agree**: our status matches the workbook (Matched "Yes" and we say `MATCHED`/`AMOUNT_MISMATCH`, or blank and we say
+`MISSING_RECEIPT`). **wrong**: we say missing where the workbook found a receipt, or matched where it found none.
+**review**: rows we left to a human; neither agree nor wrong. Exit 1 when agree is below `--min-agree` or wrong is
+above `--max-wrong`. Current September baseline: agree 82, wrong 5, review 17.
 
 ## Out of scope
 
@@ -185,7 +221,8 @@ back into ReconAI's Report tab (a later integration); OCR of the statement (text
 ## Running another month
 
 1. Copy `scripts/abujhd/config.example.json` to `data/<client>/config.json` and fill the three DocAI file ids,
-   the three file names (cited in the report), `month` (`YYYY-MM`) and the ledger `sheet`.
+   the three file names (cited in the report), `month` (`YYYY-MM`) and the ledger `sheet`. Add `"kb_id"` (the DocAI workspace id) if the report
+   should open inside ReconAI's Report tab; only one folder may carry a given `kb_id`.
 2. Run the three scripts with `--data data/<client>`: `a_refine.py` (add `--healer openai` or `claude`),
    then `b_match.py`, then `c_report.py`. `DOCAI_API_KEY` is only needed when `raw/` lacks a file.
 3. Use a new data directory per month: `raw/`, `pages/` renders and the healer `cache/` are reused when present,

@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
-import { ChevronDown, ChevronUp, FileText, FileImage, GripVertical, Search } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, FileText, FileImage, GripVertical, Search } from 'lucide-react';
 import { useAuth } from './auth-provider';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -27,9 +27,11 @@ import {
   TableHead,
   TableHeader,
   TableRow,
+  TABLE_HEAD_BAND,
 } from './ui/table';
 import { resolveUploadTarget, Workspace } from '@/lib/workspace-utils';
 import { isFileParsed, FileWithProcessing } from '@/lib/file-status';
+import { cn } from '@/lib/utils';
 import { fileKind, formatFileDate, sortFiles, type FileSortKey, type SortDir } from '@/lib/file-table';
 import { ModelSelector } from './model-selector';
 import { ProgressiveFluxLoader } from './ui/progressive-flux-loader';
@@ -463,17 +465,17 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
         <h2 className="text-h3">Files</h2>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-secondary" />
+            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search files..."
               aria-label="Search files"
-              className="w-56 pl-8"
+              className="h-10 w-64 rounded-lg bg-card pl-8 shadow-xs"
             />
           </div>
-          <Button variant="secondary" disabled={uploading} onClick={openUploadDialog}>
+          <Button disabled={uploading} onClick={openUploadDialog}>
             Upload File
           </Button>
         </div>
@@ -482,7 +484,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
       {selectedIds.size > 0 && (
         <div className="flex items-center justify-between gap-3 mb-4 p-3 bg-muted rounded-lg border border-border">
           <div className="flex items-center gap-3">
-            <span className="text-sm text-secondary">{selectedIds.size} selected</span>
+            <span className="text-sm text-muted-foreground">{selectedIds.size} selected</span>
             {unparsedSelected > 0 && (
               <Button variant="secondary" size="sm" onClick={() => bulkParse([...selectedIds])}>
                 Parse {unparsedSelected} Selected
@@ -508,7 +510,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                   Reconcile {selectedIds.size} documents
                 </Button>
                 {unparsedSelected > 0 && (
-                  <span className="text-xs text-secondary">Only parsed files can be reconciled</span>
+                  <span className="text-xs text-muted-foreground">Only parsed files can be reconciled</span>
                 )}
               </>
             )}
@@ -519,22 +521,22 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
       {files.length === 0 ? (
         <div className="py-16 text-center">
           <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
-            <FileText className="size-8 text-secondary" />
+            <FileText className="size-8 text-muted-foreground" />
           </div>
           <h3 className="text-h3">No files yet</h3>
-          <p className="mt-1 text-sm text-secondary">Upload a PDF or image to start reconciling.</p>
-          <Button variant="secondary" className="mt-4" onClick={openUploadDialog}>
+          <p className="mt-1 text-sm text-muted-foreground">Upload a PDF or image to start reconciling.</p>
+          <Button className="mt-4" onClick={openUploadDialog}>
             Upload File
           </Button>
         </div>
       ) : visibleFiles.length === 0 ? (
-        <p className="text-sm text-secondary">No files match your search.</p>
+        <p className="text-sm text-muted-foreground">No files match your search.</p>
       ) : (
-        <div className="rounded-lg border border-border shadow-sm">
-          <Table wrapperClassName="overflow-auto rounded-lg">
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <Table wrapperClassName="overflow-auto">
             <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-10 py-3.5">
+              <TableRow className="border-0 hover:bg-transparent">
+                <TableHead className={cn(TABLE_HEAD_BAND, "w-10")}>
                   <input
                     type="checkbox"
                     aria-label="Select all files"
@@ -544,13 +546,13 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                   />
                 </TableHead>
                 <TableHead
-                  className="py-3.5"
+                  className={cn(TABLE_HEAD_BAND)}
                   aria-sort={sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
                   <button
                     type="button"
                     onClick={() => cycleSort('name')}
-                    className="inline-flex items-center gap-1 hover:text-foreground"
+                    className="inline-flex items-center gap-1 uppercase hover:text-white/80"
                   >
                     File
                     {sortKey === 'name' &&
@@ -558,13 +560,13 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                   </button>
                 </TableHead>
                 <TableHead
-                  className="whitespace-nowrap py-3.5"
+                  className={cn(TABLE_HEAD_BAND, "whitespace-nowrap")}
                   aria-sort={sortKey === 'date' ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
                   <button
                     type="button"
                     onClick={() => cycleSort('date')}
-                    className="inline-flex items-center gap-1 hover:text-foreground"
+                    className="inline-flex items-center gap-1 uppercase hover:text-white/80"
                   >
                     Date Added
                     {sortKey === 'date' &&
@@ -572,20 +574,20 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                   </button>
                 </TableHead>
                 <TableHead
-                  className="py-3.5"
+                  className={cn(TABLE_HEAD_BAND)}
                   aria-sort={sortKey === 'status' ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
                   <button
                     type="button"
                     onClick={() => cycleSort('status')}
-                    className="inline-flex items-center gap-1 hover:text-foreground"
+                    className="inline-flex items-center gap-1 uppercase hover:text-white/80"
                   >
                     Status
                     {sortKey === 'status' &&
                       (sortDir === 'asc' ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />)}
                   </button>
                 </TableHead>
-                <TableHead className="py-3.5 text-right">Actions</TableHead>
+                <TableHead className={cn(TABLE_HEAD_BAND, "text-right")}>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -601,7 +603,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                     onClick={() => viewFile(f.id)}
                     className={previewFileId === f.id ? 'cursor-pointer bg-primary/5' : 'cursor-pointer'}
                   >
-                    <TableCell className={previewFileId === f.id ? 'border-l-2 border-primary py-3.5' : 'py-3.5'}>
+                    <TableCell className={previewFileId === f.id ? 'border-l-2 border-primary px-4 py-3' : 'px-4 py-3'}>
                       <input
                         type="checkbox"
                         aria-label={`Select ${f.filename}`}
@@ -611,16 +613,18 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                         className="w-4 h-4 rounded border-border cursor-pointer"
                       />
                     </TableCell>
-                    <TableCell className="min-w-[140px] py-3.5">
-                      <div className="flex items-center gap-2.5">
-                        <KindIcon className="size-4 shrink-0 text-secondary" />
-                        <span className="truncate text-sm font-medium">{f.filename}</span>
+                    <TableCell className="min-w-[140px] px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          <KindIcon className="size-4" />
+                        </span>
+                        <span className="truncate text-sm font-semibold">{f.filename}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap py-3.5 text-sm text-secondary tabular-nums">
+                    <TableCell className="whitespace-nowrap px-4 py-3 text-sm text-muted-foreground tabular-nums">
                       {formatFileDate(f.created_at)}
                     </TableCell>
-                    <TableCell className="py-3.5">
+                    <TableCell className="px-4 py-3">
                       {job ? (
                         <div className="max-w-[140px]">
                           <ProgressiveFluxLoader
@@ -639,21 +643,22 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                           <span className="sr-only">Parse: {job.status}</span>
                         </div>
                       ) : isParsed ? (
-                        <span className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          <CheckCircle2 className="size-3" />
                           Parsed
                         </span>
                       ) : emptySegments.has(f.id) ? (
                         <span
                           title="Parse finished but no text was extracted. Re-parse the file, or delete it and re-upload."
-                          className="inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning"
+                          className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
                         >
                           No parsed content
                         </span>
                       ) : (
-                        <span className="text-xs text-secondary">Not parsed</span>
+                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">Not parsed</span>
                       )}
                     </TableCell>
-                    <TableCell className="py-3.5">
+                    <TableCell className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"
@@ -728,7 +733,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                 </SelectTrigger>
                 <SelectContent>
                   {workspaces.length === 0 && (
-                    <p className="px-3 py-2 text-sm text-secondary">No workspaces yet. Create one.</p>
+                    <p className="px-3 py-2 text-sm text-muted-foreground">No workspaces yet. Create one.</p>
                   )}
                   {workspaces.map(w => (
                     <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
@@ -759,17 +764,17 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                 setRejectedCount(picked.length - accepted.length);
                 setUploadFiles(accepted);
               }}
-              className="block w-full text-sm text-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground"
+              className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground"
             />
             {uploadFiles.length > 0 && (
-              <p className="text-xs text-secondary">{uploadFiles.length} file(s) selected</p>
+              <p className="text-xs text-muted-foreground">{uploadFiles.length} file(s) selected</p>
             )}
             {rejectedCount > 0 && (
               <p className="text-xs text-destructive">
                 {rejectedCount} file(s) skipped — only PDF and image files (PNG, JPG, GIF, WEBP, TIFF, BMP) are supported.
               </p>
             )}
-            <p className="text-xs text-secondary">
+            <p className="text-xs text-muted-foreground">
               Supported formats: PDF, PNG, JPG, GIF, WEBP, TIFF, BMP only.
             </p>
           </div>
@@ -829,7 +834,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
             onMouseDown={startResize}
             title="Drag to resize the preview"
             aria-hidden="true"
-            className="hidden w-4 shrink-0 cursor-col-resize self-stretch items-center justify-center text-secondary/50 transition-colors hover:text-secondary lg:flex"
+            className="hidden w-4 shrink-0 cursor-col-resize self-stretch items-center justify-center text-muted-foreground/50 transition-colors hover:text-muted-foreground lg:flex"
           >
             <GripVertical className="size-3.5" />
           </div>

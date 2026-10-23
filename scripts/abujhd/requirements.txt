@@ -3,3 +3,4 @@ anthropic
 requests
 numpy
 Pillow
+openpyxl  # check_vs_workbook.py only

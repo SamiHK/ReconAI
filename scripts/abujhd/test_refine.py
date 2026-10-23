@@ -121,10 +121,10 @@ def test_link_and_broken():
     assert link_candidates(g, ROWS) == ["A"]
     g2 = {"amounts": [{"value": 41.0, "total_candidate": True}], "dates": [], "text": "x"}
     assert link_candidates(g2, ROWS) == ["A", "B"]
-    assert broken_rules({"amounts": [], "dates": [], "candidates": [], "text": "hello"}, []) == ["unlinked_no_total", "no_date"]
-    assert broken_rules({"amounts": [{"value": 1, "total_candidate": True}, {"value": 2, "total_candidate": True}], "dates": ["2026-09-01"], "candidates": ["A"], "text": "ok"}, []) == ["conflicting_totals"]
+    assert broken_rules({"amounts": [], "dates": [], "candidates": [], "text": "hello", "merchant_candidates": ["M"]}, []) == ["unlinked_no_total", "no_date"]
+    assert broken_rules({"amounts": [{"value": 1, "total_candidate": True}, {"value": 2, "total_candidate": True}], "dates": ["2026-09-01"], "candidates": ["A"], "text": "ok", "merchant_candidates": ["M"]}, []) == ["conflicting_totals"]
     assert garbage_rate("���� ���") > 0.3 and garbage_rate("Total 41.00") == 0.0
-    assert broken_rules({"amounts": [{"value": 1, "total_candidate": True}], "dates": ["2026-09-01"], "candidates": ["A"], "text": "ok"},
+    assert broken_rules({"amounts": [{"value": 1, "total_candidate": True}], "dates": ["2026-09-01"], "candidates": ["A"], "text": "ok", "merchant_candidates": ["M"]},
                         [{"type": "table", "cellsSource": "grid-estimate"}]) == ["bad_table"]
 
 def test_days_guard():
@@ -162,6 +162,85 @@ def test_apply_fields_and_overrides():
     assert [a["value"] for a in g["amounts"] if a["total_candidate"]] == [41.0] and len(g["amounts"]) == 2
     assert g["dates"][0] == "2026-09-02" and g["merchant_candidates"][0] == "MAZA"
     assert link_candidates(g, [{"ref": "A", "amount": 41.0, "date": "2026-09-01", "kind": "purchase"}]) == ["A"]
+
+def test_strong_total_keyword_beats_amount():
+    f = derive_fields("Amount 560.87 VAT 84.13 Total 645.00", [])
+    assert [a["value"] for a in f["amounts"] if a["total_candidate"]] == [645.0]
+    assert derive_fields("Amount 10.00", [])["amounts"] == [{"value": 10.0, "total_candidate": True}]   # weak keyword still counts alone
+    # a total-family keyword qualified as before-tax/subtotal flags nothing (real fuel receipt shape)
+    f = derive_fields("Diesel price 1.79\n645.00 SAR\n1 x 645.00 SAR\nالمجموع قبل الضريبة\n560.87 SAR\nالضريبة 15%\n84.13 SAR", [])
+    assert [a["value"] for a in f["amounts"] if a["total_candidate"]] == []
+    from common import total_flags
+    assert total_flags("Net 5.00 x 9.99") == {5.0: True, 9.99: False}
+    assert total_flags("Internet 5.00 Amount 9.99") == {5.0: False, 9.99: True}   # "net" inside a word is not a total keyword
+    assert total_flags("Net 5.00") == {5.0: True}
+    assert total_flags("Subtotal 5.00 Total 9.99") == {5.0: False, 9.99: True}
+    assert total_flags("قبل الضريبة 560.87 الإجمالي 645.00") == {560.87: False, 645.0: True}   # window stops at the previous amount
+
+def test_docai_base_url_from_env():
+    import os, importlib, common
+    old = os.environ.get("DOCAI_BASE_URL")
+    try:
+        os.environ["DOCAI_BASE_URL"] = "http://localhost:8787"; importlib.reload(common)
+        assert common.DOCAI == "http://localhost:8787"
+    finally:
+        if old is None: os.environ.pop("DOCAI_BASE_URL", None)
+        else: os.environ["DOCAI_BASE_URL"] = old
+        importlib.reload(common)
+
+def test_junk_merchant_candidates_and_no_merchant_rule():
+    # a date, a bare number, an amount, or a DocAI caption is not a merchant
+    f = derive_fields("07/09/2026\nTotal 41.00", [clean_segment(seg(1, 1, 0, 0, 1, 1, "07/09/2026", "title"))])
+    assert f["merchant_candidates"] == [], f
+    f = derive_fields("39421\nTotal 41.00", [clean_segment(seg(1, 1, 0, 0, 1, 1, "39421", "header"))])
+    assert f["merchant_candidates"] == [], f
+    f = derive_fields("KIND: photo\n\nTEXT:\nA receipt on a desk\nTotal 41.00", [])
+    assert f["merchant_candidates"] == [], f
+    f = derive_fields("MAZA REST\nTotal 41.00", [clean_segment(seg(1, 1, 0, 0, 1, 1, "MAZA REST", "title"))])
+    assert f["merchant_candidates"] == ["MAZA REST"], f
+    # no real merchant is a reason to heal, even when the group is linkable
+    g = {"amounts": [{"value": 41.0, "total_candidate": True}], "dates": ["2026-09-01"], "candidates": ["A"], "text": "ok", "merchant_candidates": []}
+    assert broken_rules(g, []) == ["no_merchant"]
+    g["merchant_candidates"] = ["MAZA REST"]
+    assert broken_rules(g, []) == []
+
+def test_figure_descriptions_carry_no_text():
+    # DocAI describes pictures in figure segments ("KIND: photo ... TEXT: ..."); the box stays for geometry, the prose does not
+    c = clean_segment(seg(0, 1, 0, 0, 500, 500, "KIND: photo\n\nTEXT:\nThe image shows a receipt with a total of 41.00", "figure"))
+    assert c["text"] == "" and c["noise"] is False, c
+    assert clean_segment(seg(1, 1, 0, 0, 10, 10, "Total 41.00", "text"))["text"] == "Total 41.00"
+    # a figure that carries real OCR (a logo with the merchant name) keeps its text
+    assert clean_segment(seg(2, 1, 0, 0, 10, 10, "HASSAN SALEH ALMUHANNA TRADING", "figure"))["text"] == "HASSAN SALEH ALMUHANNA TRADING"
+
+def test_healer_retries_transient_failures():
+    import healer, requests
+    calls = []
+    def fake_post(url, **kw):
+        calls.append(url)
+        if len(calls) < 3:
+            raise requests.ConnectionError("boom")
+        class R:
+            status_code = 200
+            text = ""
+            def json(self):
+                return {"status": "completed", "output_text": '{"segments": [], "fields": {}, "confidence": 1, "notes": ""}'}
+        return R()
+    real_post, real_sleep = requests.post, healer.time.sleep
+    requests.post, healer.time.sleep = fake_post, lambda s: None
+    try:
+        import os; os.environ["OPENAI_API_KEY"] = "x"
+        out = healer._openai("prompt", b"png")
+        assert out["confidence"] == 1 and len(calls) == 3, (out, calls)
+        calls.clear()
+        def always_fail(url, **kw):
+            calls.append(url); raise requests.ConnectionError("boom")
+        requests.post = always_fail
+        try:
+            healer._openai("prompt", b"png"); raise AssertionError("expected RuntimeError")
+        except RuntimeError as e:
+            assert "request failed" in str(e) and len(calls) == 3, (e, calls)
+    finally:
+        requests.post, healer.time.sleep = real_post, real_sleep
 
 if __name__ == "__main__":
     for name, fn in list(globals().items()):

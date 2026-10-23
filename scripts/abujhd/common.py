@@ -10,9 +10,6 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data" / "abujhd"
 RAW = PAGES = CROPS = CACHE = DATA  # re-bound by set_data()
 
-DOCAI = "http://localhost:8080"
-
-
 def set_data(path):
     global DATA, RAW, PAGES, CROPS, CACHE
     DATA = Path(path).resolve()
@@ -33,6 +30,9 @@ def env(name):
                     k, v = line.split("=", 1)
                     _env[k.strip()] = v.strip()
     return os.environ.get(name) or _env.get(name) or None
+
+
+DOCAI = env("DOCAI_BASE_URL") or "https://api.providus.ai"   # same default and override as the app (src/lib/docai-proxy.ts)
 
 
 def load_json(path):
@@ -75,6 +75,25 @@ def norm_text(s):
 _AMT = re.compile(r"(?<![\d.])(\d{1,3}(?:,\d{3})+\.\d{2}|\d+\.\d{2})(?!\d)")
 def find_amounts(text):
     return [float(m.replace(",", "")) for m in _AMT.findall(ascii_digits(text or ""))]
+
+
+_TOTAL_STRONG = re.compile(r"(total|\bnet\b|grand|الإجمالي|إجمالي|الصافي|المجموع)", re.I)
+_TOTAL_WEAK = re.compile(r"(purchase amount|amount|المبلغ|مبلغ الشراء)", re.I)
+_NOT_TOTAL = re.compile(r"(قبل الضريبة|before (vat|tax)|excl|sub ?total|without (vat|tax))", re.I)
+def total_flags(text):
+    """{amount: is_total_candidate} in first-appearance order. A total-family keyword in the 40 chars before an amount
+    (stopping at the previous amount) flags it, unless qualified before-tax/subtotal. Weak keywords ('amount') only count
+    when no strong one flagged anything."""
+    t = ascii_digits(text or "")
+    strong, weak, prev = {}, {}, 0
+    for m in _AMT.finditer(t):
+        v = float(m.group(1).replace(",", "")); before = t[max(0, m.start() - 40, prev):m.start()]; prev = m.end()
+        s = w = False
+        if not _NOT_TOTAL.search(before):
+            s, w = bool(_TOTAL_STRONG.search(before)), bool(_TOTAL_WEAK.search(before))
+        strong[v] = strong.get(v, False) or s; weak[v] = weak.get(v, False) or w
+    use = strong if any(strong.values()) else weak
+    return {v: use[v] for v in strong}
 
 
 _MONTHS = {m: i for i, m in enumerate("JAN FEB MAR APR MAY JUN JUL AUG SEP OCT NOV DEC".split(), 1)}

@@ -1,11 +1,15 @@
 'use client';
 import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Card } from './ui/card';
+import { Button } from './ui/button';
 import { ReportViewer } from './report-viewer';
 import { ReconciliationReport } from '@/engine/reconcile';
 import { getRunState, setRunState, subscribeRunState, EMPTY_RUN_STATE } from '@/lib/run-store';
 import type { ReconcileRequest } from './dashboard';
 import AgentPlan, { Task } from './ui/agent-plan';
+import { PettyCashReport } from './petty-cash/report';
+import { pettyCashPlan, PETTY_CASH_STEPS } from '@/lib/petty-cash-plan';
+import { OPENAI_CLOUD } from './model-selector';
 
 // Deterministic reconcile pipeline stages. The LLM only emits raw reasoning
 // text — WE define the stages; the streamed thinking is attached to the
@@ -271,24 +275,119 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
     }
   };
 
-  // Auto-run when a reconcile request arrives from the Files tab.
-  // kbId never changes within a mount (runner is remounted per workspace
-  // via key={kbId}), so it's safe as a dependency.
+  const [pettyCashUrl, setPettyCashUrl] = useState<string | null>(null);
+  // 'pending' until the probe answers: a Reconcile request that arrives before then waits, so a petty-cash
+  // workspace is never sent down the generic pipeline by a race.
+  const [pettyProbe, setPettyProbe] = useState<'pending' | 'yes' | 'no'>('pending');
+  const [showPettyCash, setShowPettyCash] = useState(false);
+  const [pettyRun, setPettyRun] = useState<{ busy: boolean; note: string | null; error: string | null; version: number }>({ busy: false, note: null, error: null, version: 0 });
+
+  // POST the matcher run (b_match.py + c_report.py); resolves to the summary line, rejects with the server's error.
+  const postPettyRun = async () => {
+    const res = await fetch(`/api/petty-cash/${kbId}/run`, { method: 'POST' });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'Run failed');
+    const r = body.rows || {};
+    return `Matched ${r.MATCHED ?? 0} · Needs a decision ${r.REVIEW ?? 0} · Missing receipt ${r.MISSING_RECEIPT ?? 0} · ${(body.durationMs / 1000).toFixed(1)}s`;
+  };
+
+  // The header button: re-run and reload the pane (a new version makes the report re-fetch report.json).
+  const runPettyCash = async () => {
+    setPettyRun(s => ({ ...s, busy: true, note: null, error: null }));
+    try {
+      const note = await postPettyRun();
+      setPettyRun(s => ({ busy: false, note, error: null, version: s.version + 1 }));
+      setShowPettyCash(true);
+    } catch (e) {
+      setPettyRun(s => ({ ...s, busy: false, error: e instanceof Error ? e.message : 'Run failed' }));
+    }
+  };
+
+  // The Files tab's Reconcile button in a petty-cash workspace: the same run, shown as a stepped plan, then the
+  // report. The server answers once (no stream), so the steps advance on a timer and the last completes with
+  // the response. The model only labels the first step: receipt reading is cached from the healer run.
+  const runPettyCashFromFiles = async (modelId: string) => {
+    const label = OPENAI_CLOUD.find(m => m.id === modelId)?.name ?? modelId;
+    let stage = 0;
+    setShowPettyCash(false);
+    setPettyRun(s => ({ ...s, busy: true, note: null, error: null }));
+    setRunState(kbId, s => ({ ...s, running: true, error: '', report: null, planTasks: pettyCashPlan(label, 0), thinkingOpen: true }));
+    const ticker = setInterval(() => {
+      if (stage >= PETTY_CASH_STEPS.length - 1) return;
+      stage += 1;
+      setRunState(kbId, s => ({ ...s, planTasks: pettyCashPlan(label, stage) }));
+    }, 2500);
+    try {
+      const note = await postPettyRun();
+      setRunState(kbId, s => ({ ...s, running: false, thinkingOpen: false, planTasks: pettyCashPlan(label, PETTY_CASH_STEPS.length) }));
+      setPettyRun(s => ({ busy: false, note, error: null, version: s.version + 1 }));
+      setShowPettyCash(true);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Run failed';
+      setRunState(kbId, s => ({ ...s, running: false, error: message, planTasks: pettyCashPlan(label, stage, true) }));
+      setPettyRun(s => ({ ...s, busy: false, error: message }));
+    } finally {
+      clearInterval(ticker);
+    }
+  };
+
+  // One probe per workspace: a 200 means the scripts' report.json exists for this kbId.
   useEffect(() => {
-    if (!reconcileRequest || reconcileRequest.nonce === lastNonce.current) return;
+    const url = `/api/petty-cash/${kbId}/report.json`;
+    let cancelled = false;   // no reset needed: the runner is remounted per workspace (key={kbId})
+    fetch(url, { method: 'HEAD' })
+      .then(r => {
+        if (cancelled) return;
+        if (r.ok) setPettyCashUrl(url);
+        setPettyProbe(r.ok ? 'yes' : 'no');
+      })
+      .catch(() => { if (!cancelled) setPettyProbe('no'); });
+    return () => { cancelled = true; };
+  }, [kbId]);
+
+  // Auto-run when a reconcile request arrives from the Files tab, once the probe has said which pipeline
+  // this workspace gets. kbId never changes within a mount (runner is remounted per workspace via
+  // key={kbId}), so it's safe as a dependency.
+  useEffect(() => {
+    if (!reconcileRequest || reconcileRequest.nonce === lastNonce.current || pettyProbe === 'pending') return;
     lastNonce.current = reconcileRequest.nonce;
-    run(reconcileRequest.fileIds, reconcileRequest.modelId, kbId);
-  }, [reconcileRequest, kbId]);
+    if (pettyProbe === 'yes') runPettyCashFromFiles(reconcileRequest.modelId);
+    else run(reconcileRequest.fileIds, reconcileRequest.modelId, kbId);
+    // The two run functions are recreated per render; the nonce guard makes the request fire exactly once.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reconcileRequest, kbId, pettyProbe]);
 
   return (
     <div>
-      <h2 className="text-h3 mb-4">Report</h2>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h2 className="text-h3">Report</h2>
+        {pettyCashUrl && (
+          <div className="flex items-center gap-2">
+            {pettyRun.note && <span className="text-xs text-muted-foreground">{pettyRun.note}</span>}
+            {pettyRun.error && <span className="text-xs text-destructive">{pettyRun.error}</span>}
+            <Button size="sm" onClick={runPettyCash} disabled={pettyRun.busy} aria-busy={pettyRun.busy}>
+              {pettyRun.busy ? 'Running…' : 'Run petty-cash reconciliation'}
+            </Button>
+            <button
+              type="button"
+              onClick={() => setShowPettyCash(v => !v)}
+              className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
+            >
+              {showPettyCash ? 'Back to reconciliation' : 'Petty-cash report'}
+            </button>
+          </div>
+        )}
+      </div>
+      {showPettyCash && pettyCashUrl ? (
+        <PettyCashReport kbId={kbId} version={pettyRun.version} />
+      ) : (
+        <>
 
       {/* Live reconcile pipeline (streamed during reconciliation) */}
       {(running || planTasks) && (
         <details className="group mb-8" open={thinkingOpen} onToggle={e => setRunState(kbId, s => ({ ...s, thinkingOpen: (e.target as HTMLDetailsElement).open }))}>
           <summary className="cursor-pointer text-h3 mb-2 flex items-center gap-2 select-none">
-            <span className="text-xs text-secondary transition-transform group-open:rotate-90">▶</span>
+            <span className="text-xs text-muted-foreground transition-transform group-open:rotate-90">▶</span>
             {running ? (
               <span className="inline-flex items-center gap-2" aria-live="polite">
                 <span className="w-2 h-2 rounded-full bg-foreground animate-pulse" aria-label="working" />
@@ -301,10 +400,10 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
             )}
           </summary>
           {planTasks && (
-            <AgentPlan tasks={planTasks} defaultExpanded={['reasoning']} />
+            <AgentPlan tasks={planTasks} defaultExpanded={['reasoning', 'petty']} />
           )}
           {!running && (
-            <p className="mt-3 text-xs text-secondary">
+            <p className="mt-3 text-xs text-muted-foreground">
               Model: {reconcileRequest?.modelId || 'auto'}
             </p>
           )}
@@ -322,12 +421,14 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
       ) : (
         !running && !error && (
           <Card className="p-6">
-            <p className="text-sm text-secondary">
+            <p className="text-sm text-muted-foreground">
               No report yet. Select 2+ parsed files in the Files tab and click{" "}
               <strong>Reconcile</strong> at least two parsed files to build a report here.
             </p>
           </Card>
         )
+      )}
+        </>
       )}
     </div>
   );

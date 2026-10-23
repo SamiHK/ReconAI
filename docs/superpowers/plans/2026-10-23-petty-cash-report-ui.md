@@ -1154,7 +1154,8 @@ export function LedgerLines({ lines, highlightCode }: { lines: LedgerLine[]; hig
   useEffect(() => {
     firstHit.current?.scrollIntoView({ block: 'center' });
   }, [highlightCode]);
-  let seen = false;
+  // The first highlighted line gets the scroll ref (a render-time flag would trip react-hooks/immutability).
+  const firstHitIdx = highlightCode === undefined ? -1 : lines.findIndex(l => l.code === highlightCode);
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       <Table>
@@ -1174,10 +1175,9 @@ export function LedgerLines({ lines, highlightCode }: { lines: LedgerLine[]; hig
               <TableCell colSpan={6} className="py-6 text-center text-muted-foreground">No ledger lines</TableCell>
             </TableRow>
           )}
-          {lines.map(l => {
+          {lines.map((l, i) => {
             const hit = highlightCode !== undefined && l.code === highlightCode;
-            const ref = hit && !seen ? firstHit : undefined;
-            if (hit) seen = true;
+            const ref = i === firstHitIdx ? firstHit : undefined;
             return (
               <TableRow key={`${l.row}-${l.code}`} ref={ref} className={cn(hit && 'bg-primary/10 hover:bg-primary/10')}>
                 <TableCell className="whitespace-nowrap font-mono text-xs">{l.code}</TableCell>

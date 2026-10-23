@@ -1,5 +1,6 @@
 'use client';
-import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import { useTheme } from 'next-themes';
 import { Card } from './ui/card';
 import { ReportViewer } from './report-viewer';
 import { ReconciliationReport } from '@/engine/reconcile';
@@ -273,6 +274,13 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
 
   const [pettyCashUrl, setPettyCashUrl] = useState<string | null>(null);
   const [showPettyCash, setShowPettyCash] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const frameRef = useRef<HTMLIFrameElement>(null);
+  // The report keys its dark tokens off :root.dark; mirror the app's theme onto the iframe document.
+  const syncFrameTheme = useCallback(() => {
+    frameRef.current?.contentDocument?.documentElement.classList.toggle('dark', resolvedTheme === 'dark');
+  }, [resolvedTheme]);
+  useEffect(() => { syncFrameTheme(); }, [syncFrameTheme, showPettyCash]);
 
   // One probe per workspace: a 200 means the scripts' report exists for this kbId.
   useEffect(() => {
@@ -309,6 +317,8 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
       </div>
       {showPettyCash && pettyCashUrl ? (
         <iframe
+          ref={frameRef}
+          onLoad={syncFrameTheme}
           src={pettyCashUrl}
           title="Petty-cash report"
           className="w-full rounded-xl border border-border bg-white"

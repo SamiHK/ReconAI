@@ -42,7 +42,7 @@ export function SheetPreview({ fileId, filename, onClose, className, style }: {
 
   return (
     <div
-      className={`flex h-[520px] flex-col overflow-hidden rounded-xl border border-border bg-muted/30 ${className ?? ''}`}
+      className={`flex h-[520px] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm ${className ?? ''}`}
       style={style}
     >
       <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">

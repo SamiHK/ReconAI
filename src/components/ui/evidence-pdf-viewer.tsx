@@ -524,7 +524,7 @@ export function EvidencePdfViewer({ file, onClose, className, style }: { file: M
   return (
     <div
       className={cn(
-        'flex h-[520px] flex-col overflow-hidden rounded-xl border border-border bg-muted/30',
+        'flex h-[520px] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm',
         className
       )}
       style={style}

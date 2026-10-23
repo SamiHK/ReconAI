@@ -1,6 +1,6 @@
 'use client';
 import { useEffect, useState, useRef } from 'react';
-import { ChevronDown, ChevronUp, FileText, FileImage, GripVertical, Search } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronUp, FileText, FileImage, GripVertical, Search } from 'lucide-react';
 import { useAuth } from './auth-provider';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -30,6 +30,7 @@ import {
 } from './ui/table';
 import { resolveUploadTarget, Workspace } from '@/lib/workspace-utils';
 import { isFileParsed, FileWithProcessing } from '@/lib/file-status';
+import { cn } from '@/lib/utils';
 import { fileKind, formatFileDate, sortFiles, type FileSortKey, type SortDir } from '@/lib/file-table';
 import { ModelSelector } from './model-selector';
 import { ProgressiveFluxLoader } from './ui/progressive-flux-loader';
@@ -58,6 +59,9 @@ const ACCEPT_ATTR = '.pdf,.png,.jpg,.jpeg,.gif,.webp,.tiff,.bmp';
 function isAcceptedFile(file: File): boolean {
   return ACCEPTED_TYPES.has(file.type);
 }
+
+// DocAI library table header (uploaded-documents-section.tsx): slate band, white uppercase labels
+const HEAD = 'h-11 bg-[#74737f] px-4 text-[11px] font-bold uppercase tracking-wide text-white hover:bg-[#74737f]';
 
 export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onReconcile }: { 
   kbId: string; 
@@ -470,7 +474,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
               onChange={e => setSearch(e.target.value)}
               placeholder="Search files..."
               aria-label="Search files"
-              className="w-56 pl-8"
+              className="h-10 w-64 rounded-lg bg-card pl-8 shadow-xs"
             />
           </div>
           <Button disabled={uploading} onClick={openUploadDialog}>
@@ -530,11 +534,11 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
       ) : visibleFiles.length === 0 ? (
         <p className="text-sm text-muted-foreground">No files match your search.</p>
       ) : (
-        <div className="rounded-lg border border-border shadow-sm">
-          <Table wrapperClassName="overflow-auto rounded-lg">
+        <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+          <Table wrapperClassName="overflow-auto">
             <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-10 py-3.5">
+              <TableRow className="border-0 hover:bg-transparent">
+                <TableHead className={cn(HEAD, "w-10")}>
                   <input
                     type="checkbox"
                     aria-label="Select all files"
@@ -544,13 +548,13 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                   />
                 </TableHead>
                 <TableHead
-                  className="py-3.5"
+                  className={cn(HEAD)}
                   aria-sort={sortKey === 'name' ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
                   <button
                     type="button"
                     onClick={() => cycleSort('name')}
-                    className="inline-flex items-center gap-1 hover:text-foreground"
+                    className="inline-flex items-center gap-1 uppercase hover:text-white/80"
                   >
                     File
                     {sortKey === 'name' &&
@@ -558,13 +562,13 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                   </button>
                 </TableHead>
                 <TableHead
-                  className="whitespace-nowrap py-3.5"
+                  className={cn(HEAD, "whitespace-nowrap")}
                   aria-sort={sortKey === 'date' ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
                   <button
                     type="button"
                     onClick={() => cycleSort('date')}
-                    className="inline-flex items-center gap-1 hover:text-foreground"
+                    className="inline-flex items-center gap-1 uppercase hover:text-white/80"
                   >
                     Date Added
                     {sortKey === 'date' &&
@@ -572,20 +576,20 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                   </button>
                 </TableHead>
                 <TableHead
-                  className="py-3.5"
+                  className={cn(HEAD)}
                   aria-sort={sortKey === 'status' ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                 >
                   <button
                     type="button"
                     onClick={() => cycleSort('status')}
-                    className="inline-flex items-center gap-1 hover:text-foreground"
+                    className="inline-flex items-center gap-1 uppercase hover:text-white/80"
                   >
                     Status
                     {sortKey === 'status' &&
                       (sortDir === 'asc' ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />)}
                   </button>
                 </TableHead>
-                <TableHead className="py-3.5 text-right">Actions</TableHead>
+                <TableHead className={cn(HEAD, "text-right")}>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -601,7 +605,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                     onClick={() => viewFile(f.id)}
                     className={previewFileId === f.id ? 'cursor-pointer bg-primary/5' : 'cursor-pointer'}
                   >
-                    <TableCell className={previewFileId === f.id ? 'border-l-2 border-primary py-3.5' : 'py-3.5'}>
+                    <TableCell className={previewFileId === f.id ? 'border-l-2 border-primary px-4 py-3' : 'px-4 py-3'}>
                       <input
                         type="checkbox"
                         aria-label={`Select ${f.filename}`}
@@ -611,16 +615,18 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                         className="w-4 h-4 rounded border-border cursor-pointer"
                       />
                     </TableCell>
-                    <TableCell className="min-w-[140px] py-3.5">
-                      <div className="flex items-center gap-2.5">
-                        <KindIcon className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="truncate text-sm font-medium">{f.filename}</span>
+                    <TableCell className="min-w-[140px] px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <span className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          <KindIcon className="size-4" />
+                        </span>
+                        <span className="truncate text-sm font-semibold">{f.filename}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap py-3.5 text-sm text-muted-foreground tabular-nums">
+                    <TableCell className="whitespace-nowrap px-4 py-3 text-sm text-muted-foreground tabular-nums">
                       {formatFileDate(f.created_at)}
                     </TableCell>
-                    <TableCell className="py-3.5">
+                    <TableCell className="px-4 py-3">
                       {job ? (
                         <div className="max-w-[140px]">
                           <ProgressiveFluxLoader
@@ -639,21 +645,22 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                           <span className="sr-only">Parse: {job.status}</span>
                         </div>
                       ) : isParsed ? (
-                        <span className="inline-flex items-center rounded-md bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300">
+                          <CheckCircle2 className="size-3" />
                           Parsed
                         </span>
                       ) : emptySegments.has(f.id) ? (
                         <span
                           title="Parse finished but no text was extracted. Re-parse the file, or delete it and re-upload."
-                          className="inline-flex items-center rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning"
+                          className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300"
                         >
                           No parsed content
                         </span>
                       ) : (
-                        <span className="text-xs text-muted-foreground">Not parsed</span>
+                        <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">Not parsed</span>
                       )}
                     </TableCell>
-                    <TableCell className="py-3.5">
+                    <TableCell className="px-4 py-3">
                       <div className="flex items-center justify-end gap-1">
                         <Button
                           variant="ghost"

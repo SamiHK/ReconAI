@@ -113,6 +113,10 @@ def _tables_to_rows(text):
 def clean_segment(seg):
     raw = seg.get("markdown") or ""
     text = "\n".join(norm_text(l) for l in _tables_to_rows(raw).split("\n")).strip()
+    # DocAI describes pictures in figure segments ("KIND: photo ... TEXT: ..."): prose about the image, not OCR.
+    # The box stays for geometry; the prose must not become amounts, dates or a merchant.
+    if seg.get("type") == "figure" and text.startswith("KIND:"):
+        text = ""
     return {**seg, "raw": raw, "text": text, "noise": seg.get("type") in NOISE, "healed": False, "healer": None}
 
 
@@ -157,6 +161,7 @@ def group_page(segs):
 
 
 _APPROVAL = re.compile(r"approval[^\d]{0,20}(\d{5,8})", re.I)
+_JUNK_MERCHANT = re.compile(r"^(KIND:|[\d\s.,:/()-]*$)")   # a caption, a date, a number or an amount is not a merchant
 _INVOICE = re.compile(r"(?:\binv(?:oice)?\.?\s*(?:no|#|num|رقم)?[.:\s]*|رقم الفاتورة[:\s]*|bill no\.?[:\s]*)(?=[A-Z0-9\-/]*\d)([A-Z0-9][A-Z0-9\-/]{3,})", re.I)
 
 def derive_fields(text, segs):
@@ -165,7 +170,7 @@ def derive_fields(text, segs):
     amounts = [{"value": v, "total_candidate": f} for v, f in flags.items()]
     heads = [s["text"].split("\n")[0][:60] for s in segs if s.get("type") in ("title", "header") and s["text"]]
     first = text.strip().split("\n")[0][:60] if text.strip() else ""
-    merchants = list(dict.fromkeys([h for h in heads if h] + ([first] if first else [])))
+    merchants = [m for m in dict.fromkeys([h for h in heads if h] + ([first] if first else [])) if not _JUNK_MERCHANT.match(m.strip())]
     ap = _APPROVAL.search(t); inv = _INVOICE.search(t)
     return {"amounts": amounts, "dates": list(dict.fromkeys(find_dates(t))), "merchant_candidates": merchants,
             "approval_code": ap.group(1) if ap else None, "invoice_no": inv.group(1) if inv else None}
@@ -239,6 +244,7 @@ def broken_rules(group, segs):
     if garbage_rate(group["text"]) > 0.3: rules.append("garbage")
     if any(s.get("type") == "table" and (s.get("cellsSource") == "grid-estimate" or s.get("contentStatus") not in (None, "ok")) for s in segs):
         rules.append("bad_table")
+    if not group.get("merchant_candidates"): rules.append("no_merchant")   # the matcher scores on the merchant; without one, let the healer read it
     return rules
 
 

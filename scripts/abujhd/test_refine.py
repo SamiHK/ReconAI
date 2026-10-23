@@ -175,6 +175,17 @@ def test_strong_total_keyword_beats_amount():
     assert total_flags("Subtotal 5.00 Total 9.99") == {5.0: False, 9.99: True}
     assert total_flags("قبل الضريبة 560.87 الإجمالي 645.00") == {560.87: False, 645.0: True}   # window stops at the previous amount
 
+def test_docai_base_url_from_env():
+    import os, importlib, common
+    old = os.environ.get("DOCAI_BASE_URL")
+    try:
+        os.environ["DOCAI_BASE_URL"] = "http://localhost:8787"; importlib.reload(common)
+        assert common.DOCAI == "http://localhost:8787"
+    finally:
+        if old is None: os.environ.pop("DOCAI_BASE_URL", None)
+        else: os.environ["DOCAI_BASE_URL"] = old
+        importlib.reload(common)
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_") and callable(fn):

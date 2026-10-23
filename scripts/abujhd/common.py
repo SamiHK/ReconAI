@@ -10,9 +10,6 @@ ROOT = Path(__file__).resolve().parents[2]
 DATA = ROOT / "data" / "abujhd"
 RAW = PAGES = CROPS = CACHE = DATA  # re-bound by set_data()
 
-DOCAI = "http://localhost:8080"
-
-
 def set_data(path):
     global DATA, RAW, PAGES, CROPS, CACHE
     DATA = Path(path).resolve()
@@ -33,6 +30,9 @@ def env(name):
                     k, v = line.split("=", 1)
                     _env[k.strip()] = v.strip()
     return os.environ.get(name) or _env.get(name) or None
+
+
+DOCAI = env("DOCAI_BASE_URL") or "https://api.providus.ai"   # same default and override as the app (src/lib/docai-proxy.ts)
 
 
 def load_json(path):

@@ -6,7 +6,7 @@ Date: 2026-10-22. Branch: `feat/abujhd-petty-cash`. Scripts only; no ReconAI app
 
 Client ABUJHD runs petty cash through a prepaid card at the bank, held by the cardholder.
 For September 2026 we have three sources in DocAI workspace `ABUJHD`
-(local Docker DocAI at `http://localhost:8080`; file ids live in the git-ignored `data/<client>/config.json`):
+(DocAI at `DOCAI_BASE_URL` from `.env.local`, default the hosted instance; file ids live in the git-ignored `data/<client>/config.json`):
 
 | Source | File | What it really is | Parse quality |
 |---|---|---|---|

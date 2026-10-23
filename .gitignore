@@ -9,3 +9,4 @@ demo-docs/**
 /data/abujhd/
 /ABUJHD/
 scripts/abujhd/__pycache__/
+/data/*.zip

@@ -76,7 +76,7 @@ export function TransactionsTable({ rows, selection, onSelect, compact = false }
                   <div className="text-muted-foreground">{(r.time ?? '').slice(0, 5)}</div>
                 </TableCell>
                 <TableCell className="text-right font-mono text-xs tabular-nums">{money(r.amount)}</TableCell>
-                <TableCell className="max-w-[260px]">
+                <TableCell className={cn('max-w-[260px]', compact && 'max-w-[160px]')}>
                   <div className="truncate" title={r.merchant}>{r.merchant}</div>
                   <div className="text-xs text-muted-foreground">{r.kind}</div>
                 </TableCell>

@@ -301,7 +301,7 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
           <button
             type="button"
             onClick={() => setShowPettyCash(v => !v)}
-            className="rounded-full border border-border px-3 py-1 text-xs text-secondary hover:text-foreground"
+            className="rounded-md border border-border px-3 py-1 text-xs text-secondary hover:text-foreground"
           >
             {showPettyCash ? 'Back to reconciliation' : 'Petty-cash report'}
           </button>

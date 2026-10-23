@@ -60,7 +60,7 @@ const DOT_COLORS: Record<string, string> = {
   critical: 'bg-red-500',
   high: 'bg-orange-500',
   medium: 'bg-blue-500',
-  low: 'bg-slate-400',
+  low: 'bg-muted-foreground',
 };
 
 export function ReportViewer({ report }: { report: ReconciliationReport }) {
@@ -571,7 +571,7 @@ function EvidenceButton({ finding, group, classifications }: {
                         aria-pressed={selected}
                         className={cn(
                           'size-3 shrink-0 cursor-pointer rounded-full transition-all',
-                          DOT_COLORS[finding.severity] ?? 'bg-slate-400',
+                          DOT_COLORS[finding.severity] ?? 'bg-muted-foreground',
                           selected
                             ? 'opacity-100 ring-2 ring-foreground ring-offset-2 ring-offset-background'
                             : 'opacity-50 hover:opacity-100'

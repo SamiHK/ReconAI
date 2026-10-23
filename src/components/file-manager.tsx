@@ -639,13 +639,13 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                           <span className="sr-only">Parse: {job.status}</span>
                         </div>
                       ) : isParsed ? (
-                        <span className="inline-flex items-center rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+                        <span className="inline-flex items-center rounded-md bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
                           Parsed
                         </span>
                       ) : emptySegments.has(f.id) ? (
                         <span
                           title="Parse finished but no text was extracted. Re-parse the file, or delete it and re-upload."
-                          className="inline-flex items-center rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning"
+                          className="inline-flex items-center rounded-md bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning"
                         >
                           No parsed content
                         </span>

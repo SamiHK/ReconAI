@@ -141,7 +141,7 @@ export function ReportViewer({ report }: { report: ReconciliationReport }) {
         <h3 className="text-h3 mb-4">Summary</h3>
         <p className="text-base leading-relaxed whitespace-pre-wrap">{renderInlineFormatting(summary)}</p>
 
-        <div className="text-xs text-secondary mt-4 space-y-1">
+        <div className="text-xs text-muted-foreground mt-4 space-y-1">
           <p>Generated: {new Date(timestamp).toLocaleString()}</p>
         </div>
       </Card>
@@ -158,7 +158,7 @@ export function ReportViewer({ report }: { report: ReconciliationReport }) {
         {activeSeverities.size > 0 && (
           <button
             onClick={() => setActiveSeverities(new Set())}
-            className="text-xs text-secondary underline mb-3 hover:text-foreground transition-colors"
+            className="text-xs text-muted-foreground underline mb-3 hover:text-foreground transition-colors"
           >
             Clear filter ({filteredFindings.length} shown)
           </button>
@@ -166,7 +166,7 @@ export function ReportViewer({ report }: { report: ReconciliationReport }) {
 
         <div className="space-y-3">
           {filteredFindings.length === 0 ? (
-            <p className="text-sm text-secondary">
+            <p className="text-sm text-muted-foreground">
               {activeSeverities.size > 0 ? 'No findings match the selected severities.' : 'No discrepancies found.'}
             </p>
           ) : (
@@ -188,7 +188,7 @@ export function ReportViewer({ report }: { report: ReconciliationReport }) {
         <div key={group.id} className="animate-fade-up" style={{ animationDelay: `${gi * 60}ms` }}>
           <Card className="p-6">
           <h3 className="text-h3 mb-1">Line Items</h3>
-          <p className="text-xs text-secondary mb-4">
+          <p className="text-xs text-muted-foreground mb-4">
             {group.documents.map(d => {
               const cls = documentClassifications.find(c => c.document === d);
               return cls ? `${cls.fileName} (${cls.type.replace(/_/g, ' ')})` : `Doc ${d}`;
@@ -204,7 +204,7 @@ export function ReportViewer({ report }: { report: ReconciliationReport }) {
       {unmatchedDocuments.length > 0 && (
         <Card className="p-6 border-warning/20">
           <h3 className="text-h3 mb-4 text-warning">Unmatched documents</h3>
-          <p className="text-sm text-secondary">
+          <p className="text-sm text-muted-foreground">
             These documents could not be grouped with any others:
           </p>
           <ul className="list-disc pl-4 mt-2 text-sm">
@@ -234,9 +234,9 @@ function KPIBox({ label, value, sub, tone }: {
   };
   return (
     <div className="bg-muted rounded-lg p-3 border border-border">
-      <p className="text-xs text-secondary mb-1">{label}</p>
+      <p className="text-xs text-muted-foreground mb-1">{label}</p>
       <p className={`text-h2 font-mono ${tone ? toneClasses[tone] : ''}`}>{value}</p>
-      {sub && <p className="text-xs text-secondary mt-1">{sub}</p>}
+      {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
     </div>
   );
 }
@@ -272,10 +272,10 @@ function DraftSection({ draft }: { draft: EmailDraft }) {
   return (
     <div className="rounded-md border border-border p-4">
       <div className="mb-3 flex items-center gap-2">
-        <Mail className="size-4 text-secondary" />
+        <Mail className="size-4 text-muted-foreground" />
         <span className="text-sm font-medium">{draft.to}</span>
       </div>
-      <label className="mb-1 block text-xs text-secondary">Subject</label>
+      <label className="mb-1 block text-xs text-muted-foreground">Subject</label>
       {/* Locked-live fields: editable enough to show a blinking caret and
           select text, but every mutation (typing, backspace, paste, drop)
           is blocked at beforeinput — the draft is fixed once composed.
@@ -289,7 +289,7 @@ function DraftSection({ draft }: { draft: EmailDraft }) {
         onDrop={e => e.preventDefault()}
         className="mb-3"
       />
-      <label className="mb-1 block text-xs text-secondary">Body</label>
+      <label className="mb-1 block text-xs text-muted-foreground">Body</label>
       <textarea
         value={draft.body}
         onChange={() => {}}
@@ -318,7 +318,7 @@ function SupplierEmailCard({ drafts }: { drafts: EmailDraft[] }) {
   return (
     <Card className="p-6">
       <h3 className="text-h3 mb-1">Supplier emails</h3>
-      <p className="mb-4 text-xs text-secondary">
+      <p className="mb-4 text-xs text-muted-foreground">
         Drafted from this reconciliation's findings. Review the recipient, then copy or send.
       </p>
       <div className="space-y-4">
@@ -372,7 +372,7 @@ function FindingsTable({ findings, groups, classifications }: {
           />
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-secondary">{filtered.length} of {findings.length}</span>
+          <span className="text-xs text-muted-foreground">{filtered.length} of {findings.length}</span>
           <DropdownMenu>
             <DropdownMenuTrigger render={<Button variant="outline" size="sm" />}>
               Columns
@@ -420,7 +420,7 @@ function FindingsTable({ findings, groups, classifications }: {
                 )}
                 {visibleColumns.includes('Doc') && (
                   <TableCell className="whitespace-nowrap">
-                    <span className="text-xs text-secondary font-mono">{f.document}</span>
+                    <span className="text-xs text-muted-foreground font-mono">{f.document}</span>
                   </TableCell>
                 )}
                 {visibleColumns.includes('Description') && (
@@ -579,7 +579,7 @@ function EvidenceButton({ finding, group, classifications }: {
                       />
                     );
                   })}
-                  <span className="mt-auto text-[10px] tabular-nums text-secondary">
+                  <span className="mt-auto text-[10px] tabular-nums text-muted-foreground">
                     {visibleFiles.length}/{citedFiles.length}
                   </span>
                 </div>
@@ -621,7 +621,7 @@ function EvidenceButton({ finding, group, classifications }: {
                     ))}
                   </div>
                   {hiddenCited.length > 0 && (
-                    <p className="mt-2 text-xs text-secondary">
+                    <p className="mt-2 text-xs text-muted-foreground">
                       {hiddenCited.length} more file{hiddenCited.length === 1 ? '' : 's'} in this finding —
                       click their orbit nodes or file dots to swap panes.
                     </p>

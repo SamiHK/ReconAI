@@ -39,7 +39,7 @@ export function AuthForm() {
               onChange={e => setApiKey(e.target.value)} required
               autoComplete="off"
             />
-            <p className="mt-1.5 text-xs text-secondary">
+            <p className="mt-1.5 text-xs text-muted-foreground">
               Get your API key from platform.providus.ai.
             </p>
           </div>

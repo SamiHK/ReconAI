@@ -463,7 +463,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
         <h2 className="text-h3">Files</h2>
         <div className="flex items-center gap-2">
           <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-secondary" />
+            <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="search"
               value={search}
@@ -482,7 +482,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
       {selectedIds.size > 0 && (
         <div className="flex items-center justify-between gap-3 mb-4 p-3 bg-muted rounded-lg border border-border">
           <div className="flex items-center gap-3">
-            <span className="text-sm text-secondary">{selectedIds.size} selected</span>
+            <span className="text-sm text-muted-foreground">{selectedIds.size} selected</span>
             {unparsedSelected > 0 && (
               <Button variant="secondary" size="sm" onClick={() => bulkParse([...selectedIds])}>
                 Parse {unparsedSelected} Selected
@@ -508,7 +508,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                   Reconcile {selectedIds.size} documents
                 </Button>
                 {unparsedSelected > 0 && (
-                  <span className="text-xs text-secondary">Only parsed files can be reconciled</span>
+                  <span className="text-xs text-muted-foreground">Only parsed files can be reconciled</span>
                 )}
               </>
             )}
@@ -519,16 +519,16 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
       {files.length === 0 ? (
         <div className="py-16 text-center">
           <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-full bg-muted">
-            <FileText className="size-8 text-secondary" />
+            <FileText className="size-8 text-muted-foreground" />
           </div>
           <h3 className="text-h3">No files yet</h3>
-          <p className="mt-1 text-sm text-secondary">Upload a PDF or image to start reconciling.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Upload a PDF or image to start reconciling.</p>
           <Button className="mt-4" onClick={openUploadDialog}>
             Upload File
           </Button>
         </div>
       ) : visibleFiles.length === 0 ? (
-        <p className="text-sm text-secondary">No files match your search.</p>
+        <p className="text-sm text-muted-foreground">No files match your search.</p>
       ) : (
         <div className="rounded-lg border border-border shadow-sm">
           <Table wrapperClassName="overflow-auto rounded-lg">
@@ -613,11 +613,11 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                     </TableCell>
                     <TableCell className="min-w-[140px] py-3.5">
                       <div className="flex items-center gap-2.5">
-                        <KindIcon className="size-4 shrink-0 text-secondary" />
+                        <KindIcon className="size-4 shrink-0 text-muted-foreground" />
                         <span className="truncate text-sm font-medium">{f.filename}</span>
                       </div>
                     </TableCell>
-                    <TableCell className="whitespace-nowrap py-3.5 text-sm text-secondary tabular-nums">
+                    <TableCell className="whitespace-nowrap py-3.5 text-sm text-muted-foreground tabular-nums">
                       {formatFileDate(f.created_at)}
                     </TableCell>
                     <TableCell className="py-3.5">
@@ -650,7 +650,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                           No parsed content
                         </span>
                       ) : (
-                        <span className="text-xs text-secondary">Not parsed</span>
+                        <span className="text-xs text-muted-foreground">Not parsed</span>
                       )}
                     </TableCell>
                     <TableCell className="py-3.5">
@@ -728,7 +728,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                 </SelectTrigger>
                 <SelectContent>
                   {workspaces.length === 0 && (
-                    <p className="px-3 py-2 text-sm text-secondary">No workspaces yet. Create one.</p>
+                    <p className="px-3 py-2 text-sm text-muted-foreground">No workspaces yet. Create one.</p>
                   )}
                   {workspaces.map(w => (
                     <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
@@ -759,17 +759,17 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
                 setRejectedCount(picked.length - accepted.length);
                 setUploadFiles(accepted);
               }}
-              className="block w-full text-sm text-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground"
+              className="block w-full text-sm text-muted-foreground file:mr-3 file:rounded-lg file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground"
             />
             {uploadFiles.length > 0 && (
-              <p className="text-xs text-secondary">{uploadFiles.length} file(s) selected</p>
+              <p className="text-xs text-muted-foreground">{uploadFiles.length} file(s) selected</p>
             )}
             {rejectedCount > 0 && (
               <p className="text-xs text-destructive">
                 {rejectedCount} file(s) skipped — only PDF and image files (PNG, JPG, GIF, WEBP, TIFF, BMP) are supported.
               </p>
             )}
-            <p className="text-xs text-secondary">
+            <p className="text-xs text-muted-foreground">
               Supported formats: PDF, PNG, JPG, GIF, WEBP, TIFF, BMP only.
             </p>
           </div>
@@ -829,7 +829,7 @@ export function FileManager({ kbId, onWorkspacesChanged, onSwitchWorkspace, onRe
             onMouseDown={startResize}
             title="Drag to resize the preview"
             aria-hidden="true"
-            className="hidden w-4 shrink-0 cursor-col-resize self-stretch items-center justify-center text-secondary/50 transition-colors hover:text-secondary lg:flex"
+            className="hidden w-4 shrink-0 cursor-col-resize self-stretch items-center justify-center text-muted-foreground/50 transition-colors hover:text-muted-foreground lg:flex"
           >
             <GripVertical className="size-3.5" />
           </div>

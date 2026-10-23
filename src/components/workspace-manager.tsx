@@ -85,7 +85,7 @@ export function WorkspaceManager({ selectedKB, onSelect }: {
         </SelectTrigger>
         <SelectContent side="bottom" align="start" sideOffset={6} alignItemWithTrigger={false}>
           {kbs.length === 0 && (
-            <p className="px-3 py-2 text-sm text-secondary">No workspaces yet.</p>
+            <p className="px-3 py-2 text-sm text-muted-foreground">No workspaces yet.</p>
           )}
           {kbs.map(kb => (
             <SelectItem key={kb.id} value={kb.id}>

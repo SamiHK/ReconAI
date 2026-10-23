@@ -301,7 +301,7 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
           <button
             type="button"
             onClick={() => setShowPettyCash(v => !v)}
-            className="rounded-md border border-border px-3 py-1 text-xs text-secondary hover:text-foreground"
+            className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground hover:text-foreground"
           >
             {showPettyCash ? 'Back to reconciliation' : 'Petty-cash report'}
           </button>
@@ -321,7 +321,7 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
       {(running || planTasks) && (
         <details className="group mb-8" open={thinkingOpen} onToggle={e => setRunState(kbId, s => ({ ...s, thinkingOpen: (e.target as HTMLDetailsElement).open }))}>
           <summary className="cursor-pointer text-h3 mb-2 flex items-center gap-2 select-none">
-            <span className="text-xs text-secondary transition-transform group-open:rotate-90">▶</span>
+            <span className="text-xs text-muted-foreground transition-transform group-open:rotate-90">▶</span>
             {running ? (
               <span className="inline-flex items-center gap-2" aria-live="polite">
                 <span className="w-2 h-2 rounded-full bg-foreground animate-pulse" aria-label="working" />
@@ -337,7 +337,7 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
             <AgentPlan tasks={planTasks} defaultExpanded={['reasoning']} />
           )}
           {!running && (
-            <p className="mt-3 text-xs text-secondary">
+            <p className="mt-3 text-xs text-muted-foreground">
               Model: {reconcileRequest?.modelId || 'auto'}
             </p>
           )}
@@ -355,7 +355,7 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
       ) : (
         !running && !error && (
           <Card className="p-6">
-            <p className="text-sm text-secondary">
+            <p className="text-sm text-muted-foreground">
               No report yet. Select 2+ parsed files in the Files tab and click{" "}
               <strong>Reconcile</strong> at least two parsed files to build a report here.
             </p>

@@ -1,6 +1,5 @@
 'use client';
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
-import { useTheme } from 'next-themes';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { Card } from './ui/card';
 import { Button } from './ui/button';
 import { ReportViewer } from './report-viewer';
@@ -8,6 +7,7 @@ import { ReconciliationReport } from '@/engine/reconcile';
 import { getRunState, setRunState, subscribeRunState, EMPTY_RUN_STATE } from '@/lib/run-store';
 import type { ReconcileRequest } from './dashboard';
 import AgentPlan, { Task } from './ui/agent-plan';
+import { PettyCashReport } from './petty-cash/report';
 
 // Deterministic reconcile pipeline stages. The LLM only emits raw reasoning
 // text — WE define the stages; the streamed thinking is attached to the
@@ -277,7 +277,7 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
   const [showPettyCash, setShowPettyCash] = useState(false);
   const [pettyRun, setPettyRun] = useState<{ busy: boolean; note: string | null; error: string | null; version: number }>({ busy: false, note: null, error: null, version: 0 });
 
-  // Re-run the matcher and report on the server, then reload the pane (the ?v= query busts the iframe's cached document).
+  // Re-run the matcher and report on the server, then reload the pane (a new version makes the report re-fetch report.json).
   const runPettyCash = async () => {
     setPettyRun(s => ({ ...s, busy: true, note: null, error: null }));
     try {
@@ -292,17 +292,9 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
       setPettyRun(s => ({ ...s, busy: false, error: e instanceof Error ? e.message : 'Run failed' }));
     }
   };
-  const { resolvedTheme } = useTheme();
-  const frameRef = useRef<HTMLIFrameElement>(null);
-  // The report keys its dark tokens off :root.dark; mirror the app's theme onto the iframe document.
-  const syncFrameTheme = useCallback(() => {
-    frameRef.current?.contentDocument?.documentElement.classList.toggle('dark', resolvedTheme === 'dark');
-  }, [resolvedTheme]);
-  useEffect(() => { syncFrameTheme(); }, [syncFrameTheme, showPettyCash]);
-
-  // One probe per workspace: a 200 means the scripts' report exists for this kbId.
+  // One probe per workspace: a 200 means the scripts' report.json exists for this kbId.
   useEffect(() => {
-    const url = `/api/petty-cash/${kbId}/report.html`;
+    const url = `/api/petty-cash/${kbId}/report.json`;
     let cancelled = false;   // no reset needed: the runner is remounted per workspace (key={kbId})
     fetch(url, { method: 'HEAD' })
       .then(r => { if (!cancelled && r.ok) setPettyCashUrl(url); })
@@ -341,14 +333,7 @@ export function ReconcileRunner({ kbId, reconcileRequest }: {
         )}
       </div>
       {showPettyCash && pettyCashUrl ? (
-        <iframe
-          ref={frameRef}
-          onLoad={syncFrameTheme}
-          src={pettyRun.version ? `${pettyCashUrl}?v=${pettyRun.version}` : pettyCashUrl}
-          title="Petty-cash report"
-          className="w-full rounded-xl border border-border bg-white"
-          style={{ height: 'calc(100vh - 160px)' }}
-        />
+        <PettyCashReport kbId={kbId} version={pettyRun.version} />
       ) : (
         <>
 

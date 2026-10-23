@@ -21,10 +21,10 @@ export function findFolderForKb(dataDir: string, kbId: string): string | null {
   return null;
 }
 
-/** report.html | pages/<name>.png | crops/<name>.png, every segment plain-safe (no '..', no '%', no '/'). */
+/** report.json | pages/<name>.png | crops/<name>.png, every segment plain-safe (no '..', no '%', no '/'). */
 export function isAllowedReportPath(segments: string[]): boolean {
   if (!segments.every(s => PLAIN.test(s) && s !== '..' && s !== '.')) return false;
-  if (segments.length === 1) return segments[0] === 'report.html';
+  if (segments.length === 1) return segments[0] === 'report.json';
   return segments.length === 2 && (segments[0] === 'pages' || segments[0] === 'crops') && segments[1].endsWith('.png');
 }
 

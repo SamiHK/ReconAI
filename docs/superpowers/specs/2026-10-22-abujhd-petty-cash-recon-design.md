@@ -30,7 +30,7 @@ scripts/abujhd/
   a_refine.py     EDA + clean + group + heal → segments.refined.json, groups.json,
                   statement.json, ledger.json, eda.md
   b_match.py      key relation + gap analysis → matches.json
-  c_report.py     whiteboard → report.html
+  c_report.py     report.json for the app's Report tab (2026-10-23-petty-cash-report-ui-design.md)
   test_match.py   assert-based check, run with plain `python3 scripts/abujhd/test_match.py`
 data/abujhd/      git-ignored
   config.json     file ids + names, month, ledger sheet (template: scripts/abujhd/config.example.json)
@@ -39,7 +39,7 @@ data/abujhd/      git-ignored
   crops/          <group-id>.png, the union box of a group, cut from its page render
   cache/          healer responses keyed by sha256(crop + segments)
   overrides.json  human corrections (groups) and link overrides, honoured by A and B
-  segments.refined.json groups.json statement.json ledger.json matches.json eda.md report.html
+  segments.refined.json groups.json statement.json ledger.json matches.json eda.md report.json
 ```
 
 Every script takes `--data data/abujhd` (default), is idempotent and re-runnable, and
@@ -169,6 +169,9 @@ Pass-1 amount candidates for unmerged, unhealed groups now come from `common.tot
 total-family keywords), so pass 1 is affected by the ranker too; the September gate showed no change.
 
 ## Step C — `c_report.py`
+
+> Superseded 2026-10-23: Step C now writes `report.json`, rendered by the app (see
+> `2026-10-23-petty-cash-report-ui-design.md`). The description below is the original static-HTML design.
 
 `report.html`, single self-contained file (CSS inline, images referenced relatively from
 `data/abujhd/`), no framework, light and dark via `prefers-color-scheme`.

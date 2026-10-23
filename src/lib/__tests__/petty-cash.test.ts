@@ -35,7 +35,7 @@ describe('findFolderForKb', () => {
 
 describe('isAllowedReportPath', () => {
   test('accepts the three shapes', () => {
-    expect(isAllowedReportPath(['report.html'])).toBe(true);
+    expect(isAllowedReportPath(['report.json'])).toBe(true);
     expect(isAllowedReportPath(['pages', 'page-01.png'])).toBe(true);
     expect(isAllowedReportPath(['crops', 'stmt-624417160330.png'])).toBe(true);
   });
@@ -44,6 +44,7 @@ describe('isAllowedReportPath', () => {
     expect(isAllowedReportPath(['pages', '..', 'config.json'])).toBe(false);
     expect(isAllowedReportPath(['pages', 'a', 'b.png'])).toBe(false);
     expect(isAllowedReportPath(['config.json'])).toBe(false);
+    expect(isAllowedReportPath(['report.html'])).toBe(false);
     expect(isAllowedReportPath(['pages', 'x.svg'])).toBe(false);
     expect(isAllowedReportPath(['pages', 'a%2f.png'])).toBe(false);
     expect(isAllowedReportPath([])).toBe(false);

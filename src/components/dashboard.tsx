@@ -20,9 +20,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
-import { LogOut, FileText, FileBarChart, Coins, KeyRound } from 'lucide-react';
+import { LogOut, FileText, FileBarChart, Coins, KeyRound, Sun, Moon } from 'lucide-react';
 import { useState, type CSSProperties } from 'react';
-import { NavBar } from './ui/tubelight-navbar';
+import { useTheme } from 'next-themes';
+import { BrandLogo } from './brand-logo';
+import { cn } from '@/lib/utils';
 
 type Tab = 'files' | 'report';
 
@@ -34,6 +36,7 @@ export interface ReconcileRequest {
 
 export function Dashboard() {
   const { signOut } = useAuth();
+  const { resolvedTheme, setTheme } = useTheme();
   const [tab, setTab] = useState<Tab>('files');
   const [selectedKB, setSelectedKB] = useState<string | null>(null);
   const [wsRefreshKey, setWsRefreshKey] = useState(0);
@@ -52,46 +55,46 @@ export function Dashboard() {
       // report's sticky filter pins flush at the viewport top.
       style={{ '--tabbar-h': '0px' } as CSSProperties}
     >
-      {/* Sidebar — sticky full-height rail on the LEFT: wordmark + vertical
+      {/* Sidebar — sticky full-height rail on the LEFT: logo + vertical
           tabs persist while scrolling. */}
-      <aside className="sticky top-0 z-30 flex h-screen w-16 shrink-0 flex-col border-r border-border bg-background md:w-44">
-        <button
-          type="button"
-          onClick={() => setTab('files')}
-          className="flex items-center justify-center px-3 py-5 text-h2 font-semibold cursor-pointer text-foreground transition-opacity hover:opacity-70 md:justify-start md:px-5"
-          title="Go to Files"
-        >
-          <span className="md:hidden">R</span>
-          <span className="hidden md:inline">ReconAI</span>
-        </button>
-        <nav className="flex flex-col gap-1 px-3">
-          {selectedKB && (
-            <NavBar
-              orientation="vertical"
-              items={[
-                { name: 'Files', url: '#', icon: FileText },
-                { name: 'Report', url: '#', icon: FileBarChart },
-              ]}
-              value={tab === 'files' ? 'Files' : 'Report'}
-              onChange={(name) => {
-                if (name === 'Report') setReconcileRequest(null); // manual view: don't re-trigger a run
-                setTab(name === 'Files' ? 'files' : 'report');
-              }}
-            />
-          )}
-        </nav>
+      <aside className="sticky top-0 z-30 flex h-screen w-16 shrink-0 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:w-60">
+        <div className="hidden md:flex flex-col gap-1 px-3 pt-6 pb-2 md:px-4">
+          <BrandLogo className="hidden md:block" />
+          <span className="hidden text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:inline">ReconAI</span>
+        </div>
+        {selectedKB && (
+          <nav className="flex flex-col gap-1 px-2 pt-4 md:px-3" aria-label="Sections">
+            {([
+              { key: 'files', label: 'Files', Icon: FileText },
+              { key: 'report', label: 'Report', Icon: FileBarChart },
+            ] as const).map(({ key, label, Icon }) => (
+              <button
+                key={key}
+                type="button"
+                aria-label={label}
+                title={label}
+                aria-current={tab === key ? 'page' : undefined}
+                onClick={() => { if (key === 'report') setReconcileRequest(null); setTab(key); }}
+                className={cn(
+                  'flex h-9 w-full items-center gap-2 rounded-md px-2 text-left text-sm font-medium transition-colors',
+                  tab === key ? 'bg-primary text-primary-foreground' : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground'
+                )}
+              >
+                <Icon className="size-4 shrink-0" />
+                <span className="hidden md:inline">{label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
 
-        {/* Sidebar bottom: account button — key icon + label in one row. The
-            button's click target runs all the way down to the rail's bottom
-            edge (pt-3 pb-6), while the visible row itself floats ~24px above
-            it; the account menu opens upward */}
-        <div className="mt-auto">
+        {/* Account menu opens upward */}
+        <div className="mt-auto px-2 pb-4 md:px-3">
           <DropdownMenu>
             <DropdownMenuTrigger
               render={
                 <Button
                   variant="ghost"
-                  className="w-full justify-start gap-2 rounded-none px-3 pt-7 pb-6"
+                  className="w-full justify-start gap-2 rounded-md px-2 py-2"
                   aria-label="Account menu"
                   title="Account"
                 />
@@ -109,7 +112,7 @@ export function Dashboard() {
                 text row (no pill) so nothing sticks out. */}
             <DropdownMenuContent side="top" align="start" className="w-60 p-1.5">
               <div className="flex items-center gap-2.5 rounded-md px-2.5 py-2.5">
-                <Coins className="size-4 shrink-0 text-secondary" />
+                <Coins className="size-4 shrink-0 text-muted-foreground" />
                 <span className="text-sm text-foreground">
                   <CreditDisplay />
                 </span>
@@ -121,6 +124,10 @@ export function Dashboard() {
               <DropdownMenuItem className="py-2.5" onClick={() => signOut()}>
                 <KeyRound className="size-4" />
                 Change API key
+              </DropdownMenuItem>
+              <DropdownMenuItem className="py-2.5" onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}>
+                {resolvedTheme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                {resolvedTheme === 'dark' ? 'Light theme' : 'Dark theme'}
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="py-2.5 text-destructive data-highlighted:bg-destructive/10 data-highlighted:text-destructive"
@@ -165,7 +172,7 @@ export function Dashboard() {
         {/* Body — wide cap (1600px) so the PDF preview can use the window on
             desktop; the old max-w-6xl left a big empty right margin when the
             preview was open (user: "padding on a global level") */}
-        <div className="mx-auto w-full max-w-[1600px] px-8 py-8">
+        <div className="mx-auto w-full max-w-[1600px] px-6 py-6">
           {/* Workspace Selection */}
           <section className="mb-8">
             <WorkspaceManager 

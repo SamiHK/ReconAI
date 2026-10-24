@@ -38,7 +38,7 @@ Coordinates stay in the matcher's 0-1000 page space, `[x0, y0, x1, y1]`.
     "month_label": "September 2026",
     "built_at": "2026-10-23T22:10:00",
     "sheet": "General Ledger",
-    "files": { "receipts": "INV-SEP.pdf", "statement": "Ahmed Khled  September 09.pdf", "ledger": "p.cash from 4 to 9-2026.xlsx" },
+    "files": { "receipts": "receipts.pdf", "statement": "statement.pdf", "ledger": "ledger.xlsx" },
     "page_images": { "receipts": ["pages/page-01.png", "..."], "statement": ["pages/statement-200.png"] }
   },
   "kpis": {

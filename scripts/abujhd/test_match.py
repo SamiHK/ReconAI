@@ -372,9 +372,9 @@ def test_collapse_fragments_keeps_different_days_apart():
 
 def test_collapse_fragments_keeps_distinct_invoices_apart():
     # p23/p24: one shop, one day, one total, adjacent pages, but each piece carries its own invoice number: two purchases
-    F = lambda inv: {"merchant": "AHMED SALEH AL RAHIMAN SANITARY WARE EST.", "date": "2026-09-07", "total": 10.01, "invoice_no": inv}
-    a = G("g1", 23, [10.01], ["2026-09-07"], "AHMED SALEH AL RAHIMAN SANITARY WARE EST.", kind="invoice", fields=F("1635"))
-    b = G("g2", 24, [10.01], ["2026-09-07"], "AHMED SALEH AL RAHIMAN SANITARY WARE EST.", kind="invoice", fields=F("1634"))
+    F = lambda inv: {"merchant": "KARIM SALEH AL FAHMAN SANITARY WARE EST.", "date": "2026-09-07", "total": 10.01, "invoice_no": inv}
+    a = G("g1", 23, [10.01], ["2026-09-07"], "KARIM SALEH AL FAHMAN SANITARY WARE EST.", kind="invoice", fields=F("1635"))
+    b = G("g2", 24, [10.01], ["2026-09-07"], "KARIM SALEH AL FAHMAN SANITARY WARE EST.", kind="invoice", fields=F("1634"))
     for g in (a, b): g["ids"] = [g["id"]]; g["boxes"] = [(g["page"], None)]
     assert [o["ids"] for o in collapse_fragments([a, b])] == [["g1"], ["g2"]]
     # the same number with an OCR digit dropped (one a prefix of the other) is still one invoice
@@ -393,18 +393,18 @@ def test_collapse_fragments_keeps_distinct_invoices_apart():
 
 def test_sequential_invoices_pair_with_payment_order():
     # two invoices of one shop numbered 1634 and 1635, two card payments of that shop at 13:06 and 13:10: issued in payment order
-    rows = [R("late", 10.0, "2026-09-07", "AHMED ALRAHIMAN EST", time="13:10:33"), R("early", 10.0, "2026-09-07", "AHMED ALRAHIMAN EST", time="13:06:34")]
-    F = lambda inv: {"merchant": "Ahmed Al Rahiman", "date": "2026-09-07", "total": 10.01, "invoice_no": inv}
-    a, b = _left([G("g1", 23, [10.01], ["2026-09-07"], "Ahmed Al Rahiman", fields=F("1635")), G("g2", 24, [10.01], ["2026-09-07"], "Ahmed Al Rahiman", fields=F("1634"))])
+    rows = [R("late", 10.0, "2026-09-07", "KARIM ALFAHMAN EST", time="13:10:33"), R("early", 10.0, "2026-09-07", "KARIM ALFAHMAN EST", time="13:06:34")]
+    F = lambda inv: {"merchant": "Karim Al Fahman", "date": "2026-09-07", "total": 10.01, "invoice_no": inv}
+    a, b = _left([G("g1", 23, [10.01], ["2026-09-07"], "Karim Al Fahman", fields=F("1635")), G("g2", 24, [10.01], ["2026-09-07"], "Karim Al Fahman", fields=F("1634"))])
     links, review = match_receipts([a, b], rows, {})
     assert links["g1"] is None and links["g2"] is None and set(review) == {"g1", "g2"}          # pass 1: a genuine tie
     links, review = second_pass([a, b], rows, links, review)
     assert links == {"g1": "late", "g2": "early"} and not review, (links, review)
     # three groups over the same two rows, or unnumbered invoices: still a human decision
-    c = _left([G("g3", 25, [10.01], ["2026-09-07"], "Ahmed Al Rahiman", fields=F("1636"))])[0]
+    c = _left([G("g3", 25, [10.01], ["2026-09-07"], "Karim Al Fahman", fields=F("1636"))])[0]
     l3, r3 = match_receipts([a, b, c], rows, {}); l3, r3 = second_pass([a, b, c], rows, l3, r3)
     assert set(r3) == {"g1", "g2", "g3"} and not any(l3.values()), (l3, r3)
-    u1, u2 = _left([G("u1", 23, [10.01], ["2026-09-07"], "Ahmed Al Rahiman", fields=F(None)), G("u2", 24, [10.01], ["2026-09-07"], "Ahmed Al Rahiman", fields=F(None))])
+    u1, u2 = _left([G("u1", 23, [10.01], ["2026-09-07"], "Karim Al Fahman", fields=F(None)), G("u2", 24, [10.01], ["2026-09-07"], "Karim Al Fahman", fields=F(None))])
     l4, r4 = match_receipts([u1, u2], rows, {}); l4, r4 = second_pass([u1, u2], rows, l4, r4)
     assert set(r4) == {"u1", "u2"} and not any(l4.values()), (l4, r4)
 
@@ -461,9 +461,9 @@ def test_split_payment_settles_review_rows_and_elimination_follows():
 
 def test_healer_dated_receipt_on_another_day_is_no_bare_amount_candidate():
     # p73-g1 (24.00, healer date 28/09) held the 19/09 24.00 row in REVIEW on amount alone; p59-g1 (24.15, 19/09, same shop) then links by near-amount
-    row = R("r", 24.0, "2026-09-19", "ahmed alrahiman estALAOGEER RD", time="07:38:23")
+    row = R("r", 24.0, "2026-09-19", "karim alfahman estMAIN RD", time="07:38:23")
     far = _left([G("far", 73, [24.0], ["2026-09-28"], "مؤسسة تموينات عارف", fields={"merchant": "مؤسسة تموينات عارف", "date": "2026-09-28", "total": 24.0})])[0]
-    close = _left([G("close", 59, [24.15], ["2026-09-19"], "AHMED SALEH AL RAHIMAN SANITARY WARE EST.", fields={"merchant": "AHMED SALEH AL RAHIMAN SANITARY WARE EST.", "date": "2026-09-19", "total": 24.15})])[0]
+    close = _left([G("close", 59, [24.15], ["2026-09-19"], "KARIM SALEH AL FAHMAN SANITARY WARE EST.", fields={"merchant": "KARIM SALEH AL FAHMAN SANITARY WARE EST.", "date": "2026-09-19", "total": 24.15})])[0]
     assert score(far, row) == 0
     assert score(G("undated", 1, [24.0], [], "xyz"), row) == 3              # no date at all: still the bare-amount review candidate
     assert score(G("ocr", 1, [24.0], ["2026-09-28"], "xyz"), row) == 3       # an unhealed OCR date is not trusted enough to rule the receipt out
